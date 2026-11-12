@@ -90,7 +90,25 @@ test('story beats work end to end', async ({ page }) => {
   });
   await shot('deer');
 
-  // 6. Boss: three phases, then victory.
+  // 6. Vimana: board it, fly the whole route on autopilot, land at the swamp.
+  await run(() => {
+    const g = window.__game.play;
+    g.step('vimana');
+    g.simulate(0.2);
+    g.teleport(165 + 12, -165 + 8);
+    g.simulate(0.5);
+  });
+  expect((await state()).step).toBe('flight');
+  await run(() => {
+    const g = window.__game.play;
+    g.autopilot();
+    g.simulate(6);
+  });
+  await shot('vimana');
+  await run(() => window.__game.play.simulate(150));
+  expect((await state()).step).toBe('toSwamp');
+
+  // 7. Boss: three phases, then victory.
   await run(() => {
     const g = window.__game.play;
     g.step('toSwamp');

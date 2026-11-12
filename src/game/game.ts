@@ -12,6 +12,7 @@ import { Enemy, Tataka, VIOLET, type Ctx } from './enemies';
 import { createDeer, createTarget } from './models';
 import { Particles } from './particles';
 import { Player } from './player';
+import { Vimana, VIMANA } from './vimana';
 
 const SAVE_KEY = 'ramayana.save.v1';
 const BRIDGE_Z = riverZ(60);
@@ -67,6 +68,8 @@ const STEPS: { id: string; text: string; at: () => [number, number] | null }[] =
     at: () => null,
   },
   { id: 'maricha', text: 'Maricha is unmasked. Defeat him', at: () => null },
+  { id: 'vimana', text: 'A vimana descends, sent by the gods. Board it', at: () => null },
+  { id: 'flight', text: 'Fly through the gates of light', at: () => null },
   {
     id: 'toSwamp',
     text: 'The poison flows from the swamp to the north-east. Find its source',
@@ -97,6 +100,7 @@ export class Game {
   private boss: Tataka | null = null;
   private targets: Target[] = [];
   private mayaWalls: { box: Box; mesh: THREE.Mesh; fade: number }[] = [];
+  private readonly vimana = new Vimana();
   private deer = createDeer();
   private deerPos = new THREE.Vector3();
   private deerWp = 0;
@@ -143,7 +147,14 @@ export class Game {
   ) {
     this.col = new Colliders(world);
     this.group.name = 'game';
-    this.group.add(this.player.root, this.arrows.group, this.fx.points, this.flash, this.deer.root);
+    this.group.add(
+      this.player.root,
+      this.arrows.group,
+      this.fx.points,
+      this.flash,
+      this.deer.root,
+      this.vimana.group,
+    );
     this.deer.root.visible = false;
 
     // Astra glyph rings that spin around the bow while chanting.
@@ -338,6 +349,7 @@ export class Game {
         riverFight: 'toRiver',
         maze: 'toTemple',
         maricha: 'deer',
+        flight: 'vimana',
         boss: 'toSwamp',
       };
       const id = STEPS[save.step]?.id ?? 'practice';
@@ -348,10 +360,10 @@ export class Game {
       this.hud.toast('Journey resumed');
     } else {
       this.enter(0, true);
-      this.hud.story(
+      this.card(
+        'hermitage',
         'Dandaka',
         'Exile has brought Rama, Sita and Lakshmana to the hermitage at Panchavati. The forest is beautiful, and it is not what it seems.',
-        9,
       );
     }
     if (this.known.has('vayavya')) this.heart.visible = false;
@@ -363,6 +375,20 @@ export class Game {
     this.player.invulnerable = 0;
     this.active = true;
     this.hud.show(true);
+  }
+
+  /** Shows an illustrated story card and holds the game until the player continues. */
+  private card(art: string, title: string, text: string, portrait = false): void {
+    if (navigator.webdriver) {
+      this.hud.story(title, text, 8); // automated tests: never block on a click
+      return;
+    }
+    this.paused = true;
+    document.exitPointerLock?.();
+    void this.hud.card(art, title, text, portrait).then(() => {
+      this.paused = false;
+      this.input.requestLock();
+    });
   }
 
   /** Moves the story to a step and sets up whatever that step needs. */
@@ -390,7 +416,28 @@ export class Game {
       this.spawn('archer', x - 20, z + 12);
       this.spawn('grunt', x + 4, z + 4);
     }
+    if (id !== 'vimana' && id !== 'flight') this.vimana.hide(this.scene);
+    if (id === 'vimana') {
+      if (this.deerPos.lengthSq() < 1)
+        this.deerPos.set(
+          DEER_ROUTE[DEER_ROUTE.length - 1]![0],
+          0,
+          DEER_ROUTE[DEER_ROUTE.length - 1]![1],
+        );
+      const vx = this.deerPos.x + 12;
+      const vz = this.deerPos.z + 8;
+      this.vimana.park(vx, this.col.groundAt(vx, vz), vz);
+    }
+    if (id === 'flight') {
+      this.vimana.takeOff(this.scene);
+      this.player.root.visible = false;
+    }
     if (id === 'deer') {
+      this.card(
+        'deer',
+        'The golden deer',
+        'Sita has seen a deer of living gold by the river bridge. Nothing so beautiful walks this forest by chance. Follow it, and trust your sight.',
+      );
       this.deerWp = 0;
       this.deerActive = true;
       this.deerPos.set(DEER_ROUTE[0]![0], 0, DEER_ROUTE[0]![1]);
@@ -455,10 +502,11 @@ export class Game {
       };
       this.audio.play('roar');
       this.shake = 0.7;
-      this.hud.story(
+      this.card(
+        'tataka',
         'Tataka',
-        'The water heaves. Tataka, who poisoned this forest, rises to meet you.',
-        7,
+        'The water heaves. Tataka, who poisoned this forest, rises to meet you. She charges first: step aside and strike while she is stunned.',
+        true,
       );
     }
     if (id === 'done') this.won = true;
@@ -480,7 +528,8 @@ export class Game {
     this.player.health = this.player.maxHealth;
     this.audio.play('shrine');
     this.hud.flashGold();
-    this.hud.story(title, text, 9);
+    const art = what === 'agneya' ? 'forest' : what === 'drishti' ? 'night' : 'temple';
+    this.card(art, title, text);
   }
 
   // ---------------------------------------------------------------- combat helpers
@@ -672,6 +721,11 @@ export class Game {
     this.timeScale += (targetScale - this.timeScale) * Math.min(1, dt * 14);
     const gdt = dt * this.timeScale;
 
+    if (STEPS[this.step]!.id === 'flight') {
+      this.updateFlight(dt);
+      return 1;
+    }
+
     // --- camera look
     this.camYaw -= input.lookX;
     this.camPitch = Math.max(-1.15, Math.min(1.1, this.camPitch - input.lookY));
@@ -798,9 +852,87 @@ export class Game {
       this.won = false;
       this.paused = true;
       document.exitPointerLock?.();
-      this.showOverlay('won');
+      if (navigator.webdriver) this.showOverlay('won');
+      else
+        void this.hud
+          .card(
+            'rama',
+            'Dharma prevails',
+            'Tataka is defeated and the swamp breathes again. The path of the bow continues south, towards Kishkindha.',
+            true,
+          )
+          .then(() => this.showOverlay('won'));
     }
     return this.timeScale;
+  }
+
+  /** The vimana ride: its own controls, camera and HUD. */
+  private updateFlight(dt: number): void {
+    const v = this.vimana;
+    const cam = this.camera;
+    const aim = cam.getWorldDirection(new THREE.Vector3());
+    const done = v.update(
+      dt,
+      this.input,
+      this.arrows,
+      this.fx,
+      this.audio,
+      this.scene,
+      (x, z) => this.col.groundAt(x, z),
+      aim,
+    );
+    this.player.pos.copy(v.pos);
+    this.arrows.update(dt, this.col, v.targets, { pos: this.player.pos, alive: false }, this.fx);
+    this.fx.update(dt);
+    this.world.weather.rainTarget = 0.25 + 0.75 * v.storm;
+
+    const cp = Math.cos(v.pitch);
+    const fwd = new THREE.Vector3(Math.sin(v.yaw) * cp, Math.sin(v.pitch), Math.cos(v.yaw) * cp);
+    cam.position
+      .copy(v.pos)
+      .addScaledVector(fwd, -17)
+      .add(new THREE.Vector3(0, 5.5, 0));
+    cam.lookAt(v.pos.clone().addScaledVector(fwd, 30));
+    const fov = THREE.MathUtils.lerp(
+      60,
+      85,
+      THREE.MathUtils.clamp((v.speed - VIMANA.cruise) / (VIMANA.diveMax - VIMANA.cruise), 0, 1),
+    );
+    cam.fov += (fov - cam.fov) * Math.min(1, dt * 3);
+    cam.updateProjectionMatrix();
+    this.camYaw = v.yaw + Math.PI;
+
+    this.audio.update(this.world.weather.rain, v.targets.length > 0);
+    this.hud.update(dt, {
+      health: v.hull / VIMANA.hull,
+      focus: 1,
+      objective: `Fly through the gates of light (${v.gate} of ${v.gateCount})   ·   Shift: boost   ·   Click: loose arrows`,
+      markerAngle: null,
+      markerDistance: 0,
+      camYaw: this.camYaw,
+      spread: 0.3,
+      showCross: true,
+      astras: [],
+      drishti: { known: false, cooldown: 0 },
+      boss: null,
+      hurt: 0,
+    });
+    if (done) {
+      const [lx, lz] = Vimana.landing();
+      this.respawnAt = [lx, lz];
+      this.player.respawn(lx, lz, this.col.groundAt(lx, lz));
+      this.player.invulnerable = 0;
+      this.player.root.visible = true;
+      this.camYaw = Math.atan2(-(POI.swamp.x - lx), -(POI.swamp.z - lz));
+      this.camPitch = -0.1;
+      this.world.weather.rainTarget = 0.5;
+      this.hud.story(
+        'The swamp',
+        'The vimana sets you down at the edge of the poisoned water and rises back into the storm.',
+        7,
+      );
+      this.enter(stepIndex('toSwamp'));
+    }
   }
 
   private nearestEnemy(): [number, number] | null {
@@ -995,7 +1127,10 @@ export class Game {
 
   /** How dark the boss wants the world (0..1); main.ts applies it to light and fog. */
   get darkness(): number {
-    return this.bossDarkness;
+    return Math.max(
+      this.bossDarkness,
+      this.vimana.active ? this.vimana.storm * 0.55 * (1 - this.vimana.lightning) : 0,
+    );
   }
 
   private updateStory(gdt: number): void {
@@ -1053,10 +1188,10 @@ export class Game {
         break;
       case 'toTemple':
         if (near(GATE.x, GATE.z, 9)) {
-          this.hud.story(
+          this.card(
+            'temple',
             'The ruined temple',
             'These halls shift when no one is looking. Some walls are only maya: use Divya Drishti, or test them with an arrow.',
-            8,
           );
           this.enter(this.step + 1);
         }
@@ -1070,7 +1205,16 @@ export class Game {
             'The wind of Vayu answers. Hold Q to raise a cyclone that lifts your enemies and scatters poison. Press 1 or 2 to choose an astra.',
           );
           this.heart.visible = false;
-          this.hud.toast("Sita's voice carries on the wind: a golden deer, by the river bridge");
+          this.enter(this.step + 1);
+        }
+        break;
+      case 'vimana':
+        if (near(this.vimana.pos.x, this.vimana.pos.z, 8)) {
+          this.card(
+            'vimana',
+            'The vimana',
+            'A chariot of the gods, with lotus wings. Steer with the mouse or W A S D, hold Shift to boost, click to loose arrows. Fly through the gates of light; a storm stands between you and the swamp.',
+          );
           this.enter(this.step + 1);
         }
         break;
@@ -1135,6 +1279,12 @@ export class Game {
       this.clearEnemies();
       this.known = new Set(['agneya', 'vayavya']);
       this.drishtiKnown = true;
+      if (id === 'vimana')
+        this.deerPos.set(
+          DEER_ROUTE[DEER_ROUTE.length - 1]![0],
+          0,
+          DEER_ROUTE[DEER_ROUTE.length - 1]![1],
+        );
       this.enter(stepIndex(id), true);
     },
     cast: (what: AstraId | 'drishti'): void =>
@@ -1156,6 +1306,7 @@ export class Game {
       mayaOpen: this.mayaWalls.filter((w) => w.box.off).length,
     }),
     hurtBoss: (amount: number): void => this.boss?.hit(amount, false),
+    autopilot: (): void => void (this.vimana.autopilot = true),
     /** Runs the game logic for a number of seconds without waiting for frames (used by tests). */
     simulate: (seconds: number): void => {
       for (let t = 0; t < seconds; t += 1 / 30) this.update(1 / 30, t);

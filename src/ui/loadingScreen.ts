@@ -5,6 +5,12 @@ export class LoadingScreen {
   private readonly label = document.getElementById('loading-label')!;
   private readonly begin = document.getElementById('loading-begin') as HTMLButtonElement;
 
+  constructor() {
+    // Title key art (Higgsfield) behind the title.
+    const art = document.getElementById('loading-art');
+    if (art) art.style.backgroundImage = `url(${import.meta.env.BASE_URL}art/title.jpg)`;
+  }
+
   setProgress(fraction: number, text: string): void {
     this.bar.style.transform = `scaleX(${Math.min(1, Math.max(0, fraction))})`;
     this.label.textContent = text;

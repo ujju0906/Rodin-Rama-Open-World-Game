@@ -25,12 +25,16 @@
   - All sound is synthesised with Web Audio: rain, drone, combat pulse, bow, astras, hits.
   - Tests: `npm test` runs the smoke test and an end-to-end story test (`tests/play.spec.ts`) that drives every beat through to victory.
 
+- **Art and vimana pass (2026-11-12).**
+  - The ten Higgsfield concept images (attached by Ujwal) are in `/ArtRef` and `public/art` as web-sized JPEGs.
+  - Title screen uses the key art. Illustrated full-screen story cards at the hermitage, the shrines, the temple, the golden deer, the vimana, Tataka and the ending.
+  - Vimana flight (Phase 5): procedural craft with lotus-petal wings and teal crystals, arcade flight with boost and dives, speed-based field of view, eight gates of light over the whole map, a storm with rain, darkness and lightning, three waves of sky rakshasas, arrows from the deck. The flight lands at the swamp.
+  - Higgsfield 3D cost checked: a textured, rigged Rama (Meshy 7 image-to-3D) is 44 credits; an unrigged single-object mesh (SAM 3) is 1 credit. Balance is 0.5, so no 3D model was generated.
+
 ## Next
-- Vimana flight and the storm route (Phase 5, not started).
 - Real character models: Higgsfield image-to-3D with rigging needs credits (balance is 0.5).
 - Astra wheel (radial menu), ledge climbing, skill trees, cutscene cameras, depth of field.
 - Cascaded shadows; tree collision; Rapier physics (installed but not used: movement is a simple kinematic controller on the heightfield).
-- Use the Higgsfield concept art for the title and loading screens once the files are in `/ArtRef`.
 - Phase 7 hosting on a public host (Netlify, Cloudflare Pages or GitHub Pages).
 
 ## Known issues
@@ -40,7 +44,8 @@
 - The golden deer chase needs only one Divya Drishti pulse at the end of its route; earlier pulses just make it flicker.
 - Tataka has 720 health, not the 1200 in the design draft (tuned in `src/data/gameplay.ts`).
 - Trees are not cleared around the swamp arena's far edge, so arrows there can be blocked visually but not physically.
-- Concept images are not in `/ArtRef` as files (this workspace cannot download from Higgsfield's host).
+- This workspace cannot download from Higgsfield's host, so any generated GLB has to be downloaded by Ujwal and attached before it can go into the game.
+- The vimana cannot be failed: if the hull reaches zero the craft finishes the route on its own.
 
 ## Controls
 W A S D move, mouse look, Shift sprint, Ctrl dodge, Space jump. Hold and release left mouse to shoot (right mouse aims). Hold Q to chant an astra (1 / 2 or Tab to choose). E for Divya Drishti. Esc pauses. P photo mode. F stats. Gamepad is supported.

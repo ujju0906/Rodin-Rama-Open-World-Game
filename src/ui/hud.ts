@@ -23,6 +23,7 @@ const el = <T extends HTMLElement>(sel: string): T => document.querySelector(sel
 export class Hud {
   private root: HTMLDivElement;
   private overlay: HTMLDivElement;
+  private cardEl: HTMLDivElement;
   private storyTimer = 0;
   private toastTimer = 0;
 
@@ -41,11 +42,41 @@ export class Hud {
       <div class="astras"></div>`;
     this.overlay = document.createElement('div');
     this.overlay.id = 'overlay';
-    document.body.append(this.root, this.overlay);
+    this.cardEl = document.createElement('div');
+    this.cardEl.id = 'card';
+    this.cardEl.innerHTML =
+      '<div class="art"></div><div class="shade"></div><div class="text"><h2></h2><p></p><small>Click to continue</small></div>';
+    document.body.append(this.root, this.overlay, this.cardEl);
   }
 
   show(on: boolean): void {
     this.root.classList.toggle('on', on);
+  }
+
+  /** Full-screen illustrated story card. Resolves when the player clicks or presses Enter. */
+  card(art: string, title: string, text: string, portrait = false): Promise<void> {
+    const c = this.cardEl;
+    (c.querySelector('.art') as HTMLElement).style.backgroundImage =
+      `url(${import.meta.env.BASE_URL}art/${art}.jpg)`;
+    c.querySelector('h2')!.textContent = title;
+    c.querySelector('p')!.textContent = text;
+    c.classList.toggle('portrait', portrait);
+    c.classList.remove('on');
+    void c.offsetWidth; // restart the animations
+    c.classList.add('on');
+    return new Promise((resolve) => {
+      const opened = performance.now();
+      const done = (e: Event): void => {
+        if (performance.now() - opened < 600) return;
+        if (e instanceof KeyboardEvent && e.key !== 'Enter' && e.key !== ' ') return;
+        c.removeEventListener('click', done);
+        window.removeEventListener('keydown', done);
+        c.classList.remove('on');
+        resolve();
+      };
+      c.addEventListener('click', done);
+      window.addEventListener('keydown', done);
+    });
   }
 
   story(title: string, text: string, seconds = 7): void {
