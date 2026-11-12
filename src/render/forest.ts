@@ -266,6 +266,8 @@ export class Forest {
   private readonly leafDepth: THREE.MeshDepthMaterial;
   treeCount = 0;
   fernCount = 0;
+  /** Trunk positions in 10 m buckets, for character collision. */
+  private trunks = new Map<number, { x: number; z: number; r: number }[]>();
 
   constructor(
     private readonly hf: Heightfield,
@@ -296,6 +298,7 @@ export class Forest {
       if (child instanceof THREE.InstancedMesh) child.dispose();
     }
     this.chunks = [];
+    this.trunks.clear();
     this.treeCount = this.fernCount = 0;
     const hf = this.hf;
     const half = WORLD.size / 2;
@@ -329,6 +332,11 @@ export class Forest {
             dummy.scale.set(s, s * (0.9 + pick * 0.25), s);
             dummy.updateMatrix();
             mats[type]!.push(dummy.matrix.clone());
+            const key = Math.floor(px / 10) * 4096 + Math.floor(pz / 10);
+            if (!this.trunks.has(key)) this.trunks.set(key, []);
+            this.trunks
+              .get(key)!
+              .push({ x: px, z: pz, r: (type === 1 ? 1.5 : type === 2 ? 0.3 : 0.7) * s });
             tints[type]!.push(tint);
           }
         }
@@ -427,6 +435,27 @@ export class Forest {
     deadMesh.castShadow = deadMesh.receiveShadow = true;
     deadMesh.computeBoundingSphere();
     this.group.add(deadMesh);
+  }
+
+  /** Pushes a circle out of any tree trunk it overlaps. */
+  pushOut(p: THREE.Vector3, r: number): void {
+    const cx = Math.floor(p.x / 10);
+    const cz = Math.floor(p.z / 10);
+    for (let i = -1; i <= 1; i++) {
+      for (let j = -1; j <= 1; j++) {
+        const list = this.trunks.get((cx + i) * 4096 + cz + j);
+        if (!list) continue;
+        for (const t of list) {
+          const dx = p.x - t.x;
+          const dz = p.z - t.z;
+          const d = Math.hypot(dx, dz);
+          if (d < t.r + r && d > 0.0001) {
+            p.x += (dx / d) * (t.r + r - d);
+            p.z += (dz / d) * (t.r + r - d);
+          }
+        }
+      }
+    }
   }
 
   /** Switches each chunk between detailed, simplified and hidden based on camera distance. */

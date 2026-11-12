@@ -12,6 +12,7 @@ import { GameAudio } from './core/audio';
 import { Input } from './core/input';
 import { FlyCamera } from './game/flyCamera';
 import { Game } from './game/game';
+import { loadRig } from './game/rig';
 import { Hud } from './ui/hud';
 import { World } from './render/world';
 import { VIEWPOINTS } from './data/world';
@@ -97,6 +98,8 @@ async function boot(): Promise<void> {
   const input = new Input(canvas);
   const audio = new GameAudio();
   const hud = new Hud();
+  loading.setProgress(0.72, 'Waking the heroes');
+  await loadRig();
   const game = new Game(scene, camera, world, input, audio, hud);
   let photo = false;
 

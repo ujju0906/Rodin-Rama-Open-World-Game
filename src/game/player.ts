@@ -150,8 +150,50 @@ export class Player {
     return dodged;
   }
 
+  /** Vertical aim angle, set by the game from the camera. */
+  aimPitch = 0;
+  private aimBlend = 0;
+
+  private animateRig(dt: number, speed: number): void {
+    const f = this.figure;
+    const rig = f.rig!;
+    f.root.position.copy(this.pos);
+    f.root.rotation.y = this.yaw;
+    const rolling = this.dodgeT > 0;
+    f.body.rotation.x = rolling
+      ? (1 - this.dodgeT / PLAYER.dodgeTime) * Math.PI * 2
+      : this.swimming
+        ? 1.2
+        : 0;
+    f.body.position.y = rolling ? 0.75 : this.swimming ? 0.5 : 0;
+    f.body.position.z = this.swimming ? -0.6 : 0;
+    this.aimBlend += ((this.drawing || this.aiming ? 1 : 0) - this.aimBlend) * Math.min(1, dt * 12);
+    f.root.updateMatrixWorld(true);
+    rig.update(dt, this.grounded || this.swimming ? speed : 1.2, this.yaw, {
+      aim: rolling ? 0 : this.aimBlend,
+      draw: this.draw,
+      pitch: this.aimPitch,
+    });
+
+    // Kodanda follows the left hand: upright and facing the aim when raised, slung low otherwise.
+    const hand = rig.worldPos('LeftHand', new THREE.Vector3());
+    f.root.worldToLocal(hand);
+    f.bow.position.copy(hand);
+    f.bow.rotation.set(0, -Math.PI / 2, THREE.MathUtils.lerp(1.15, 0, this.aimBlend), 'YXZ');
+    f.bow.rotation.x = THREE.MathUtils.lerp(0, -this.aimPitch, this.aimBlend);
+    f.bow.visible = !rolling;
+    f.nocked.visible = this.drawing;
+    f.nocked.position.x = -0.1 - this.draw * 0.26;
+    for (const m of f.skins) m.emissive.setRGB(this.hurtFlash * 3, 0, 0);
+    f.root.visible = !(this.invulnerable > 0.4 && Math.floor(this.invulnerable * 14) % 2 === 0);
+  }
+
   private animate(dt: number, speed: number): void {
     const f = this.figure;
+    if (f.rig) {
+      this.animateRig(dt, speed);
+      return;
+    }
     f.root.position.copy(this.pos);
     f.root.rotation.y = this.yaw;
     this.walkPhase += dt * (3 + speed * 1.5);

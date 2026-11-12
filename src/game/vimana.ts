@@ -251,7 +251,7 @@ export class Vimana {
 
   private spawnWave(scene: THREE.Scene, ahead: THREE.Vector3): void {
     for (let i = 0; i < 3; i++) {
-      const fig = createRakshasa('grunt');
+      const fig = createRakshasa('grunt', true);
       for (const s of [-1, 1]) {
         const wing = new THREE.Mesh(
           new THREE.ConeGeometry(0.5, 1.9, 4),

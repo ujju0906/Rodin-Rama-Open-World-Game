@@ -373,6 +373,7 @@ export class Game {
       this.col.groundAt(this.respawnAt[0], this.respawnAt[1]),
     );
     this.player.invulnerable = 0;
+    this.player.yaw = this.camYaw + Math.PI; // start facing away from the camera
     this.active = true;
     this.hud.show(true);
   }
@@ -790,6 +791,7 @@ export class Game {
       this.castDrishti();
 
     // --- player and enemies
+    p.aimPitch = this.camPitch;
     if (p.update(gdt, input, this.camYaw, this.col, canAct)) this.audio.play('dodge');
     for (const t of this.targets)
       t.group.visible = STEPS[this.step]!.id === 'practice' || t.group.rotation.x !== 0;

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Rig, rigReady } from './rig';
 
 /**
  * Procedural placeholder characters. Each is a small jointed figure that can be
@@ -16,6 +17,30 @@ export interface Figure {
   skins: THREE.MeshStandardMaterial[];
   /** World-space height of the head centre for a figure of scale 1. */
   headY: number;
+  /** Skinned, animated body when the character model is loaded. */
+  rig?: Rig;
+}
+
+/** Wraps a skinned rig in the same shape the procedural figures use, so gameplay code is unchanged. */
+function rigged(skin: number, joints: number, glow?: THREE.Color): Figure & { rig: Rig } {
+  const rig = new Rig(skin, joints, glow);
+  const root = new THREE.Group();
+  const body = new THREE.Group();
+  body.add(rig.scene);
+  root.add(body);
+  const dummy = (): THREE.Group => new THREE.Group();
+  return {
+    root,
+    body,
+    armL: dummy(),
+    armR: dummy(),
+    legL: dummy(),
+    legR: dummy(),
+    head: new THREE.Mesh(),
+    skins: rig.materials,
+    headY: 1.68,
+    rig,
+  };
 }
 
 const std = (color: number, roughness = 0.7, metalness = 0): THREE.MeshStandardMaterial =>
@@ -94,6 +119,7 @@ export interface RamaFigure extends Figure {
 
 /** Rama in exile: dusky blue skin, saffron garments, topknot, quiver and the bow Kodanda. */
 export function createRama(): RamaFigure {
+  if (rigReady()) return createRiggedRama();
   const f = humanoid({ skin: 0x3b5d86, cloth: 0xd9781e, bulk: 1, skirt: 0.5 });
   const hair = std(0x0c0a0a, 0.5);
   const gold = std(0xd9a441, 0.3, 1);
@@ -176,7 +202,8 @@ export function createRama(): RamaFigure {
   return { ...f, bow, string, nocked };
 }
 
-export function createRakshasa(kind: 'grunt' | 'archer' | 'maricha'): Figure {
+export function createRakshasa(kind: 'grunt' | 'archer' | 'maricha', simple = false): Figure {
+  if (rigReady() && !simple) return createRiggedRakshasa(kind);
   const f = humanoid({
     skin: kind === 'maricha' ? 0x3a2416 : 0x241a20,
     cloth: kind === 'maricha' ? 0x8a6a1e : 0x5a1616,
@@ -217,6 +244,7 @@ export function createRakshasa(kind: 'grunt' | 'archer' | 'maricha'): Figure {
 
 /** Tataka: a towering rakshasi with wild hair, tusks, bronze plates and vermilion markings. */
 export function createTataka(): Figure {
+  if (rigReady()) return createRiggedTataka();
   const f = humanoid({ skin: 0x4b4a4c, cloth: 0x1c1418, bulk: 1.45, skirt: 0.78 });
   const mark = new THREE.MeshStandardMaterial({
     color: 0x7a1408,
@@ -326,4 +354,314 @@ export function createTarget(): THREE.Group {
     disc.rotation.x = Math.PI / 2;
   });
   return g;
+}
+
+// ---------------------------------------------------------------- rigged versions
+
+function buildBow(gold: THREE.Material): {
+  bow: THREE.Group;
+  string: THREE.Mesh;
+  nocked: THREE.Mesh;
+} {
+  const bow = new THREE.Group();
+  const arc = mesh(
+    new THREE.TorusGeometry(0.74, 0.024, 8, 36, Math.PI * 0.86),
+    gold,
+    -0.74,
+    0,
+    0,
+    bow,
+  );
+  arc.rotation.z = -Math.PI * 0.43;
+  for (const s of [-1, 1])
+    mesh(new THREE.SphereGeometry(0.04, 8, 6), gold, -0.574, s * 0.72, 0, bow);
+  mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.2, 8), std(0x7a1f12, 0.7), 0, 0, 0, bow);
+  const string = mesh(
+    new THREE.CylinderGeometry(0.004, 0.004, 1.44, 4),
+    std(0xf4e6c8, 0.4),
+    -0.574,
+    0,
+    0,
+    bow,
+  );
+  const nocked = mesh(
+    new THREE.CylinderGeometry(0.009, 0.009, 0.95, 5),
+    new THREE.MeshStandardMaterial({
+      color: 0xf4d58a,
+      emissive: new THREE.Color(1.6, 0.9, 0.25),
+      roughness: 0.4,
+    }),
+    -0.1,
+    0,
+    0,
+    bow,
+  );
+  nocked.rotation.z = Math.PI / 2;
+  nocked.visible = false;
+  return { bow, string, nocked };
+}
+
+function createRiggedRama(): RamaFigure {
+  const f = rigged(0x40669a, 0xd9a441);
+  const rig = f.rig;
+  const hair = std(0x0c0a0a, 0.5);
+  const gold = std(0xd9a441, 0.3, 1);
+  const saffron = new THREE.MeshStandardMaterial({
+    color: 0xe07f1c,
+    roughness: 0.8,
+    side: THREE.DoubleSide,
+  });
+  const bark = new THREE.MeshStandardMaterial({
+    color: 0x7a5a34,
+    roughness: 0.95,
+    side: THREE.DoubleSide,
+  });
+
+  // Hair, topknot and tilak.
+  const head = new THREE.Group();
+  mesh(
+    new THREE.SphereGeometry(0.112, 16, 12, 0, Math.PI * 2, 0, 1.05),
+    hair,
+    0,
+    0.105,
+    -0.01,
+    head,
+  );
+  mesh(new THREE.SphereGeometry(0.105, 14, 10), hair, 0, 0.08, -0.045, head).scale.set(1, 1.1, 0.8);
+  mesh(new THREE.SphereGeometry(0.06, 12, 10), hair, 0, 0.245, -0.02, head);
+  mesh(new THREE.TorusGeometry(0.045, 0.011, 6, 14), gold, 0, 0.2, -0.02, head).rotation.x =
+    Math.PI / 2;
+  mesh(new THREE.BoxGeometry(0.014, 0.045, 0.01), std(0xc8281a, 0.6), 0, 0.13, 0.108, head);
+  for (const s of [-1, 1])
+    mesh(new THREE.CapsuleGeometry(0.03, 0.2, 4, 8), hair, s * 0.085, -0.03, -0.06, head);
+  rig.attach('Head', head);
+
+  // Dhoti: an open skirt of saffron panels from the waist, plus a bark-cloth wrap and sash.
+  const hips = new THREE.Group();
+  mesh(new THREE.CylinderGeometry(0.175, 0.2, 0.16, 16, 1, true), bark, 0, 0.04, 0, hips);
+  mesh(
+    new THREE.CylinderGeometry(0.19, 0.3, 0.62, 18, 3, true, 0.5, Math.PI * 2 - 1.0),
+    saffron,
+    0,
+    -0.3,
+    0,
+    hips,
+  );
+  mesh(new THREE.TorusGeometry(0.185, 0.022, 6, 20), gold, 0, 0.1, 0, hips).rotation.x =
+    Math.PI / 2;
+  const tail = mesh(new THREE.PlaneGeometry(0.16, 0.6), saffron, 0.1, -0.28, 0.2, hips);
+  tail.rotation.x = -0.12;
+  rig.attach('Hips', hips);
+
+  const chest = new THREE.Group();
+  const sash = mesh(new THREE.TorusGeometry(0.165, 0.028, 6, 24), saffron, 0, 0.0, 0.0, chest);
+  sash.rotation.set(Math.PI / 2, 0.7, 0);
+  sash.scale.set(1.12, 0.72, 1.25);
+  const quiver = mesh(
+    new THREE.CylinderGeometry(0.055, 0.045, 0.6, 10),
+    std(0x5a3a1e, 0.6),
+    -0.08,
+    0.06,
+    -0.16,
+    chest,
+  );
+  quiver.rotation.z = -0.4;
+  for (let i = 0; i < 5; i++) {
+    mesh(
+      new THREE.CylinderGeometry(0.006, 0.006, 0.24, 4),
+      gold,
+      -0.02 + i * 0.016,
+      0.4,
+      (i % 2) * 0.02 - 0.01,
+      quiver,
+    );
+    mesh(
+      new THREE.ConeGeometry(0.02, 0.07, 4),
+      std(0xf4e6c8, 0.8),
+      -0.02 + i * 0.016,
+      0.5,
+      (i % 2) * 0.02 - 0.01,
+      quiver,
+    );
+  }
+  mesh(
+    new THREE.TorusGeometry(0.075, 0.012, 6, 16),
+    std(0x7a2f1a, 0.8),
+    0,
+    0.17,
+    0.02,
+    chest,
+  ).rotation.x = Math.PI / 2; // prayer beads
+  rig.attach('Spine2', chest);
+
+  // Kodanda is placed at the left hand every frame (see Player.animate).
+  const { bow, string, nocked } = buildBow(gold);
+  f.root.add(bow);
+  return { ...f, bow, string, nocked };
+}
+
+function createRiggedRakshasa(kind: 'grunt' | 'archer' | 'maricha'): Figure {
+  const f = rigged(
+    kind === 'maricha' ? 0x4a2c14 : 0x1f171c,
+    kind === 'maricha' ? 0xc99a2e : 0x6e1512,
+  );
+  const rig = f.rig;
+  const bone = std(0xc9bfa5, 0.6);
+  const eye = new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 0.5, 0.1), fog: false });
+  const head = new THREE.Group();
+  for (const s of [-1, 1]) {
+    const horn = mesh(new THREE.ConeGeometry(0.04, 0.3, 8), bone, s * 0.09, 0.22, 0.02, head);
+    horn.rotation.z = -s * 0.55;
+    mesh(new THREE.SphereGeometry(0.02, 6, 6), eye, s * 0.04, 0.085, 0.1, head);
+    mesh(new THREE.ConeGeometry(0.016, 0.07, 5), bone, s * 0.035, 0.0, 0.105, head).rotation.x =
+      Math.PI;
+  }
+  mesh(
+    new THREE.SphereGeometry(0.112, 12, 10, 0, Math.PI * 2, 0, 1.0),
+    std(0x0d0a0b, 0.9),
+    0,
+    0.105,
+    -0.01,
+    head,
+  );
+  rig.attach('Head', head);
+  const cloth = new THREE.MeshStandardMaterial({
+    color: kind === 'maricha' ? 0x8a6a1e : 0x5a1616,
+    roughness: 0.9,
+    side: THREE.DoubleSide,
+  });
+  const hips = new THREE.Group();
+  mesh(new THREE.CylinderGeometry(0.2, 0.3, 0.42, 14, 1, true), cloth, 0, -0.16, 0, hips);
+  mesh(
+    new THREE.TorusGeometry(0.2, 0.03, 6, 16),
+    std(0x3a2a1a, 0.5, 0.8),
+    0,
+    0.06,
+    0,
+    hips,
+  ).rotation.x = Math.PI / 2;
+  rig.attach('Hips', hips);
+  const chest = new THREE.Group();
+  for (const s of [-1, 1])
+    mesh(
+      new THREE.SphereGeometry(0.11, 10, 8, 0, Math.PI * 2, 0, 1.6),
+      std(0x3a2a1a, 0.45, 0.9),
+      s * 0.2,
+      0.12,
+      0,
+      chest,
+    );
+  rig.attach('Spine2', chest);
+  if (kind === 'archer') {
+    const arc = mesh(
+      new THREE.TorusGeometry(0.55, 0.02, 5, 18, Math.PI * 0.86),
+      std(0x2c1b12, 0.6),
+    );
+    arc.rotation.set(0, 0, -Math.PI * 0.43);
+    rig.attach('LeftHand', arc);
+  } else {
+    const club = mesh(
+      new THREE.CylinderGeometry(0.1, 0.035, 1.0, 8),
+      std(0x2c1b12, 0.8),
+      0,
+      0.4,
+      0,
+    );
+    const spikes = mesh(
+      new THREE.IcosahedronGeometry(0.14, 0),
+      std(0x55504a, 0.4, 0.8),
+      0,
+      0.5,
+      0,
+      club,
+    );
+    spikes.scale.y = 1.6;
+    rig.attach('RightHand', club);
+  }
+  return f;
+}
+
+function createRiggedTataka(): Figure {
+  const f = rigged(0x55565a, 0x8a1a0a, new THREE.Color(1.9, 0.28, 0.06));
+  const rig = f.rig;
+  const bronze = std(0x9c6a2c, 0.35, 1);
+  const hairMat = std(0x15100e, 0.9);
+  const bone = std(0xd6ccb2, 0.5);
+  const head = new THREE.Group();
+  for (let i = 0; i < 18; i++) {
+    const a = (i / 18) * Math.PI * 2;
+    const len = 0.5 + (i % 4) * 0.14;
+    if (Math.sin(a) > 0.35) continue; // keep the face clear
+    const lock = mesh(
+      new THREE.ConeGeometry(0.045, len, 6),
+      hairMat,
+      Math.cos(a) * 0.11,
+      0.1 - len * 0.42,
+      Math.sin(a) * 0.11 - 0.03,
+      head,
+    );
+    lock.rotation.set(Math.sin(a) * 0.35 + Math.PI, 0, -Math.cos(a) * 0.35);
+  }
+  mesh(
+    new THREE.SphereGeometry(0.114, 12, 10, 0, Math.PI * 2, 0, 1.0),
+    hairMat,
+    0,
+    0.105,
+    -0.01,
+    head,
+  );
+  mesh(new THREE.ConeGeometry(0.05, 0.14, 8), bronze, 0, 0.26, 0.02, head);
+  for (const s of [-1, 1]) {
+    mesh(
+      new THREE.SphereGeometry(0.024, 6, 6),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(6, 0.8, 0.1), fog: false }),
+      s * 0.042,
+      0.088,
+      0.1,
+      head,
+    );
+    mesh(new THREE.ConeGeometry(0.014, 0.07, 6), bone, s * 0.055, 0.0, 0.095, head).rotation.z =
+      s * 0.5;
+    mesh(new THREE.TorusGeometry(0.035, 0.008, 5, 10), bronze, s * 0.115, 0.02, 0.0, head);
+  }
+  rig.attach('Head', head);
+  const robe = new THREE.MeshStandardMaterial({
+    color: 0x241820,
+    roughness: 0.9,
+    side: THREE.DoubleSide,
+  });
+  const hips = new THREE.Group();
+  mesh(
+    new THREE.CylinderGeometry(0.21, 0.42, 0.85, 18, 2, true, 0.4, Math.PI * 2 - 0.8),
+    robe,
+    0,
+    -0.4,
+    0,
+    hips,
+  );
+  mesh(
+    new THREE.CylinderGeometry(0.22, 0.34, 0.4, 18, 1, true),
+    new THREE.MeshStandardMaterial({ color: 0x6a1420, roughness: 0.85, side: THREE.DoubleSide }),
+    0,
+    -0.16,
+    0,
+    hips,
+  );
+  mesh(new THREE.TorusGeometry(0.215, 0.04, 6, 20), bronze, 0, 0.06, 0, hips).rotation.x =
+    Math.PI / 2;
+  mesh(new THREE.SphereGeometry(0.075, 10, 8), bronze, 0, 0.04, 0.21, hips);
+  rig.attach('Hips', hips);
+  const chest = new THREE.Group();
+  for (const s of [-1, 1])
+    mesh(
+      new THREE.SphereGeometry(0.14, 12, 10, 0, Math.PI * 2, 0, 1.6),
+      bronze,
+      s * 0.21,
+      0.12,
+      0,
+      chest,
+    );
+  mesh(new THREE.TorusGeometry(0.13, 0.014, 6, 18), bronze, 0, 0.14, 0.06, chest).rotation.x = 1.2;
+  rig.attach('Spine2', chest);
+  return f;
 }

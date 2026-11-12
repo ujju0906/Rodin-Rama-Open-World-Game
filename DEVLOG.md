@@ -31,16 +31,24 @@
   - Vimana flight (Phase 5): procedural craft with lotus-petal wings and teal crystals, arcade flight with boost and dives, speed-based field of view, eight gates of light over the whole map, a storm with rain, darkness and lightning, three waves of sky rakshasas, arrows from the deck. The flight lands at the swamp.
   - Higgsfield 3D cost checked: a textured, rigged Rama (Meshy 7 image-to-3D) is 44 credits; an unrigged single-object mesh (SAM 3) is 1 credit. Balance is 0.5, so no 3D model was generated.
 
+- **Character pass (2026-11-12).**
+  - Rama, the rakshasas, Maricha and Tataka are now skinned, animated 3D figures: one rigged humanoid (`public/models/figure.glb`, the three.js example model "Xbot", Mixamo skeleton) with idle, walk and run clips blended by speed. Each character re-colours it and attaches its own hair, garments, armour and weapons to the bones.
+  - Aiming, drawing and striking are posed in code on top of the clips (arm bones are pointed along the aim), and the bow follows the left hand.
+  - If the model fails to load, the old jointed figures are used.
+  - Tree trunks now block Rama and enemies.
+  - `viewer.html` is a developer page that shows the characters side by side (`VIEWER=1 npx playwright test viewer`). It is not published.
+
 ## Next
 - Real character models: Higgsfield image-to-3D with rigging needs credits (balance is 0.5).
 - Astra wheel (radial menu), ledge climbing, skill trees, cutscene cameras, depth of field.
-- Cascaded shadows; tree collision; Rapier physics (installed but not used: movement is a simple kinematic controller on the heightfield).
+- Cascaded shadows; Rapier physics (installed but not used: movement is a simple kinematic controller on the heightfield).
 - Phase 7 hosting on a public host (Netlify, Cloudflare Pages or GitHub Pages).
 
 ## Known issues
 - Frame rate is unverified on real hardware: headless Chrome here uses software rendering (about 0.3 fps on Low). Press F in the game to see the meter; change quality in the pause menu.
-- Characters are simple jointed placeholders, not the painterly look in the concept art.
-- You can walk through tree trunks. Enemies walk in straight lines and can get stuck on temple walls.
+- Characters share one mannequin-style body with a smooth, featureless face. They are animated and dressed, but not the painterly look in the concept art; that still needs bespoke models.
+- The golden deer and the flying rakshasas in the vimana section are still simple shapes.
+- Enemies walk in straight lines and can get stuck on temple walls or trees.
 - The golden deer chase needs only one Divya Drishti pulse at the end of its route; earlier pulses just make it flicker.
 - Tataka has 720 health, not the 1200 in the design draft (tuned in `src/data/gameplay.ts`).
 - Trees are not cleared around the swamp arena's far edge, so arrows there can be blocked visually but not physically.

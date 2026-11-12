@@ -217,6 +217,15 @@ export class Enemy implements Hittable {
     else if (this.lift <= 0 && ml > 0.01) f.root.rotation.y = Math.atan2(moveX, moveZ);
     this.phase += dt * (2 + speed * 1.8);
     animateWalk(f, this.phase, Math.min(1, speed / 3), attackPose);
+    f.root.updateMatrixWorld(true);
+    f.rig?.update(
+      dt,
+      speed / this.def.scale,
+      f.root.rotation.y,
+      this.kind === 'archer'
+        ? { aim: attackPose > 0 || this.state !== 'idle' ? 1 : 0 }
+        : { attack: attackPose },
+    );
     f.body.rotation.x = this.stagger > 0 ? -0.35 : 0;
     const glow =
       this.revealed > 0 ? (this.kind === 'clone' ? [1.2, 0.2, 1.8] : [1.6, 1.0, 0.2]) : [0, 0, 0];
@@ -461,6 +470,8 @@ export class Tataka implements Hittable {
     f.root.position.copy(this.pos);
     this.walk += dt * (1.5 + speed * 0.6);
     animateWalk(f, this.walk, Math.min(1, speed / 3), attackPose);
+    f.root.updateMatrixWorld(true);
+    f.rig?.update(dt, speed / BOSS.scale, f.root.rotation.y, { attack: attackPose });
     f.root.visible = this.phase !== 3 || this.revealed > 0 || this.stunned;
     const g = this.revealed > 0 && this.phase === 3 ? 0.9 : 0;
     for (const m of f.skins)

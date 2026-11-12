@@ -70,6 +70,7 @@ export class Colliders {
         p.z += (dz / d) * (min - d);
       }
     }
+    this.world.forest.pushOut(p, r);
     const lim = WORLD.size / 2 - 6;
     p.x = Math.max(-lim, Math.min(lim, p.x));
     p.z = Math.max(-lim, Math.min(lim, p.z));
