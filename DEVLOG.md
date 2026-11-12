@@ -43,9 +43,11 @@
   - The model has no skeleton, so `src/game/ramaModel.ts` skins it when the game loads: the shared skeleton is posed like the statue and each vertex takes the bone weights of the nearest reference vertices. Torso cloth is kept off the arm bones.
   - The bow Kodanda stays a separate procedural prop so it can be raised and drawn.
 
+- **Final pass (2026-11-12).** Astra wheel (hold Tab: time slows, all five astras on a ring, sealed ones greyed out). Optional recorded music and narration picked up from `src/assets/audio`. `README.md` with run, build and hosting steps; GitHub Pages workflow in `.github/workflows/pages.yml`.
+
 ## Next
 - Real character models: Higgsfield image-to-3D with rigging needs credits (balance is 0.5).
-- Astra wheel (radial menu), ledge climbing, skill trees, cutscene cameras, depth of field.
+- Ledge climbing, skill trees, cutscene cameras, depth of field.
 - Cascaded shadows; Rapier physics (installed but not used: movement is a simple kinematic controller on the heightfield).
 - Phase 7 hosting on a public host (Netlify, Cloudflare Pages or GitHub Pages).
 

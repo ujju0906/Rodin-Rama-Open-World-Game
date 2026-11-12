@@ -39,7 +39,8 @@ export class Hud {
       <div class="boss"><span>Tataka</span><div class="bar"><i></i></div></div>
       <div class="story"><h3></h3><p></p></div>
       <div class="bars"><div class="bar hp"><i></i></div><div class="bar fo"><i></i></div></div>
-      <div class="astras"></div>`;
+      <div class="astras"></div>
+      <div id="wheel"></div>`;
     this.overlay = document.createElement('div');
     this.overlay.id = 'overlay';
     this.cardEl = document.createElement('div');
@@ -170,6 +171,26 @@ export class Hud {
       (boss.querySelector('i') as HTMLElement).style.transform = `scaleX(${Math.max(0, s.boss)})`;
   }
 
+  /** Astra wheel: all astras around a ring; `hot` is the index under the pointer (-1 for none). */
+  wheel(
+    open: boolean,
+    items: { name: string; deity: string; known: boolean }[] = [],
+    hot = -1,
+  ): void {
+    const w = el('#wheel');
+    w.classList.toggle('on', open);
+    if (!open) return;
+    const pick = items[hot];
+    w.innerHTML =
+      items
+        .map((it, i) => {
+          const a = (i / items.length) * Math.PI * 2 - Math.PI / 2;
+          return `<div class="w ${it.known ? 'known' : ''} ${i === hot ? 'hot' : ''}" style="left:${Math.cos(a) * 135}px;top:${Math.sin(a) * 135}px"><b>${it.known ? it.name[0] : '·'}</b>${it.known ? it.name.replace('astra', '') : 'Sealed'}</div>`;
+        })
+        .join('') +
+      `<div class="c">${pick ? (pick.known ? `${pick.name}<br>gift of ${pick.deity}` : 'Not yet learned') : 'Move to choose'}</div>`;
+  }
+
   /** Pause / death / victory screen. */
   overlayShow(
     kind: 'pause' | 'dead' | 'won',
@@ -188,7 +209,7 @@ export class Hud {
       <tr><td>Move / look</td><td>W A S D / mouse</td></tr>
       <tr><td>Sprint · dodge · jump</td><td>Shift · Ctrl · Space</td></tr>
       <tr><td>Draw and release the bow</td><td>hold and release left mouse (right mouse: aim)</td></tr>
-      <tr><td>Chant an astra</td><td>hold Q, release when the rings are full (1 / 2 or Tab to choose)</td></tr>
+      <tr><td>Chant an astra</td><td>hold Q, release when the rings are full (hold Tab for the astra wheel, or 1 / 2)</td></tr>
       <tr><td>Divya Drishti</td><td>E</td></tr>
       <tr><td>Focus (slow time)</td><td>draw while in the air or just after a dodge</td></tr>
       <tr><td>Photo camera · stats</td><td>P · F</td></tr></table>`;

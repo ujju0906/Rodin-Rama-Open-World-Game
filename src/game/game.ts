@@ -386,6 +386,7 @@ export class Game {
     }
     this.paused = true;
     document.exitPointerLock?.();
+    this.audio.narrate(art);
     void this.hud.card(art, title, text, portrait).then(() => {
       this.paused = false;
       this.input.requestLock();
@@ -718,7 +719,13 @@ export class Game {
     // --- time scale: focus slow-motion and hit pause
     this.hitPause = Math.max(0, this.hitPause - dt);
     p.focusActive = this.focusLatch && p.drawing && p.focus > 0;
-    const targetScale = this.hitPause > 0 ? 0.05 : p.focusActive ? BOW.focusTimeScale : 1;
+    const targetScale = this.wheelOpen
+      ? 0.15
+      : this.hitPause > 0
+        ? 0.05
+        : p.focusActive
+          ? BOW.focusTimeScale
+          : 1;
     this.timeScale += (targetScale - this.timeScale) * Math.min(1, dt * 14);
     const gdt = dt * this.timeScale;
 
@@ -727,7 +734,17 @@ export class Game {
       return 1;
     }
 
-    // --- camera look
+    // --- camera look (the astra wheel borrows the mouse while it is open)
+    if (input.keys.has('tab')) {
+      this.wheelX += input.lookX * 260;
+      this.wheelY += input.lookY * 260;
+      const len = Math.hypot(this.wheelX, this.wheelY);
+      if (len > 150) {
+        this.wheelX *= 150 / len;
+        this.wheelY *= 150 / len;
+      }
+      input.lookX = input.lookY = 0;
+    }
     this.camYaw -= input.lookX;
     this.camPitch = Math.max(-1.15, Math.min(1.1, this.camPitch - input.lookY));
 
@@ -770,8 +787,7 @@ export class Game {
       this.cooldown[k] = Math.max(0, this.cooldown[k]! - gdt);
     if (input.hit('1') && this.known.has('agneya')) this.selected = 'agneya';
     if (input.hit('2') && this.known.has('vayavya')) this.selected = 'vayavya';
-    if (input.hit('tab') && this.known.size > 1)
-      this.selected = this.selected === 'agneya' ? 'vayavya' : 'agneya';
+    this.updateWheel();
     const def = ASTRAS[this.selected];
     if (
       canAct &&
@@ -934,6 +950,36 @@ export class Game {
         7,
       );
       this.enter(stepIndex('toSwamp'));
+    }
+  }
+
+  private wheelOpen = false;
+  private wheelX = 0;
+  private wheelY = 0;
+
+  /** Hold Tab: time slows and the astra wheel opens; move the mouse towards an astra and release. */
+  private updateWheel(): void {
+    const ids = Object.keys(ASTRAS) as AstraId[];
+    const held = this.input.keys.has('tab') && !this.player.dead;
+    const items = ids.map((id) => ({
+      name: ASTRAS[id].name,
+      deity: ASTRAS[id].deity,
+      known: this.known.has(id),
+    }));
+    let hot = -1;
+    if (Math.hypot(this.wheelX, this.wheelY) > 45) {
+      const a = Math.atan2(this.wheelY, this.wheelX) + Math.PI / 2;
+      hot = Math.round(((((a / (Math.PI * 2)) % 1) + 1) % 1) * ids.length) % ids.length;
+    }
+    if (held) {
+      this.wheelOpen = true;
+      this.hud.wheel(true, items, hot);
+    } else if (this.wheelOpen) {
+      this.wheelOpen = false;
+      this.hud.wheel(false);
+      const id = ids[hot];
+      if (id && this.known.has(id) && ASTRAS[id].implemented) this.selected = id;
+      this.wheelX = this.wheelY = 0;
     }
   }
 

@@ -2,7 +2,19 @@
  * All sound is synthesised with Web Audio (no audio files yet): rain and wind beds,
  * a tanpura-like drone, combat pulse, and one-shot effects. Starts after the first click.
  */
+/** Optional recorded audio (music, narration) found in src/assets/audio at build time. */
+const FILES = import.meta.glob('../assets/audio/*.mp3', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+}) as Record<string, string>;
+const fileUrl = (name: string): string | undefined =>
+  Object.entries(FILES).find(([k]) => k.endsWith(`/${name}.mp3`))?.[1];
+
 export class GameAudio {
+  private music: HTMLAudioElement | null = null;
+  private voice: HTMLAudioElement | null = null;
+
   private ctx: AudioContext | null = null;
   private master!: GainNode;
   private rainGain!: GainNode;
@@ -63,6 +75,15 @@ export class GameAudio {
       o.start();
     }
 
+    // Recorded theme, if one was added to src/assets/audio; it replaces the synthesised drone.
+    const theme = fileUrl('theme');
+    if (theme) {
+      this.music = new Audio(theme);
+      this.music.loop = true;
+      this.music.volume = this.volume * 0.45;
+      void this.music.play().catch(() => undefined);
+    }
+
     // Combat pulse: a low drum hit twice a second, faded in during fights.
     this.combatGain = ctx.createGain();
     this.combatGain.gain.value = 0;
@@ -100,8 +121,19 @@ export class GameAudio {
     return buf;
   }
 
+  /** Plays a recorded line (for example a story card's narration) if the file exists. */
+  narrate(name: string): void {
+    const url = fileUrl(`narration-${name}`);
+    this.voice?.pause();
+    if (!url) return;
+    this.voice = new Audio(url);
+    this.voice.volume = Math.min(1, this.volume * 1.2);
+    void this.voice.play().catch(() => undefined);
+  }
+
   setVolume(v: number): void {
     this.volume = v;
+    if (this.music) this.music.volume = v * 0.45;
     if (this.ctx) this.master.gain.value = v;
   }
 
@@ -111,7 +143,7 @@ export class GameAudio {
     const t = this.ctx.currentTime;
     this.rainGain.gain.setTargetAtTime(rain * 0.11, t, 0.8);
     this.combatGain.gain.setTargetAtTime(combat ? 0.32 : 0, t, combat ? 0.5 : 1.5);
-    this.droneGain.gain.setTargetAtTime(combat ? 0.03 : 0.055, t, 1);
+    this.droneGain.gain.setTargetAtTime(this.music ? 0 : combat ? 0.03 : 0.055, t, 1);
   }
 
   private tone(
