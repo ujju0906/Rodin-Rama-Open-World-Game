@@ -1,18 +1,21 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+// Inlined as base64 so the game needs no separate model request (some hosts cannot serve .glb files).
+import figureData from '../assets/figureData';
 
 /**
  * Skinned, animated humanoid shared by Rama, the rakshasas and Tataka.
  * The mesh and its idle / walk / run clips come from one GLB (see CREDITS.md);
  * each character re-colours it and attaches its own garments and props to the bones.
- * When a bespoke model exists, swap `public/models/figure.glb` (Mixamo bone names).
+ * When a bespoke model exists, swap `src/assets/figure.glb` (Mixamo bone names).
  */
 let source: GLTF | null = null;
 
 export async function loadRig(): Promise<boolean> {
   try {
-    source = await new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}models/figure.glb`);
+    const bytes = Uint8Array.from(atob(figureData), (c) => c.charCodeAt(0));
+    source = await new GLTFLoader().parseAsync(bytes.buffer, '');
     return true;
   } catch (err) {
     console.warn('Character model failed to load; using simple figures instead.', err);

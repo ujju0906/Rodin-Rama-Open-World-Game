@@ -32,7 +32,7 @@
   - Higgsfield 3D cost checked: a textured, rigged Rama (Meshy 7 image-to-3D) is 44 credits; an unrigged single-object mesh (SAM 3) is 1 credit. Balance is 0.5, so no 3D model was generated.
 
 - **Character pass (2026-11-12).**
-  - Rama, the rakshasas, Maricha and Tataka are now skinned, animated 3D figures: one rigged humanoid (`public/models/figure.glb`, the three.js example model "Xbot", Mixamo skeleton) with idle, walk and run clips blended by speed. Each character re-colours it and attaches its own hair, garments, armour and weapons to the bones.
+  - Rama, the rakshasas, Maricha and Tataka are now skinned, animated 3D figures: one rigged humanoid (`src/assets/figure.glb`, the three.js example model "Xbot", Mixamo skeleton) with idle, walk and run clips blended by speed. Each character re-colours it and attaches its own hair, garments, armour and weapons to the bones.
   - Aiming, drawing and striking are posed in code on top of the clips (arm bones are pointed along the aim), and the bow follows the left hand.
   - If the model fails to load, the old jointed figures are used.
   - Tree trunks now block Rama and enemies.
