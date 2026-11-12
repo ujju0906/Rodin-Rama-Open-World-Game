@@ -27,12 +27,12 @@ export class Input {
       if (!this.locked) this.fire = this.aim = false;
     });
     document.addEventListener('mousemove', (e) => {
-      if (!this.locked) return;
+      // Without pointer lock (some embedded frames refuse it) dragging with a button held still looks around.
+      if (!this.locked && e.buttons === 0) return;
       this.lookX += e.movementX * 0.0023 * this.sensitivity;
       this.lookY += e.movementY * 0.0023 * this.sensitivity;
     });
     canvas.addEventListener('mousedown', (e) => {
-      if (!this.locked) return;
       if (e.button === 0) this.fire = true;
       if (e.button === 2) this.aim = true;
     });

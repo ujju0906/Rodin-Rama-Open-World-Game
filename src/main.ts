@@ -284,7 +284,8 @@ async function boot(): Promise<void> {
   game.start();
   input.requestLock();
   window.__game.started = true;
-  hint.textContent = 'Click to take control   ·   Esc: pause and controls';
+  hint.textContent =
+    'Click to take control (or hold a mouse button and drag to look)   ·   Esc: pause and controls';
   setTimeout(() => (hint.style.transition = 'opacity 2s'), 0);
   setTimeout(() => (hint.style.opacity = '0'), 8000);
 
@@ -297,6 +298,7 @@ async function boot(): Promise<void> {
   window.addEventListener('keydown', (e) => {
     const k = e.key.toLowerCase();
     if (k === 'f') meter.visible = !meter.visible;
+    else if (k === 'escape' && !input.locked && game.active && !photo) game.pause();
     else if (k === 'p' && !game.paused) {
       // Photo mode: free camera, no HUD.
       photo = !photo;
