@@ -38,6 +38,11 @@
   - Tree trunks now block Rama and enemies.
   - `viewer.html` is a developer page that shows the characters side by side (`VIEWER=1 npx playwright test viewer`). It is not published.
 
+- **Rama model (2026-11-12).** Rama's body is now the Rodin (Hyper3D) model Ujwal generated from the concept art.
+  - `scripts/prep-rama.py` reads the 1,000,000-triangle OBJ, cuts off the bow that was fused to the left hand, reduces the mesh to about 143,000 triangles and packs it into `src/assets/ramaMesh.ts`. Textures (diffuse, normal, roughness + metallic) are in `public/art/rama_*.jpg`.
+  - The model has no skeleton, so `src/game/ramaModel.ts` skins it when the game loads: the shared skeleton is posed like the statue and each vertex takes the bone weights of the nearest reference vertices. Torso cloth is kept off the arm bones.
+  - The bow Kodanda stays a separate procedural prop so it can be raised and drawn.
+
 ## Next
 - Real character models: Higgsfield image-to-3D with rigging needs credits (balance is 0.5).
 - Astra wheel (radial menu), ledge climbing, skill trees, cutscene cameras, depth of field.
@@ -46,7 +51,8 @@
 
 ## Known issues
 - Frame rate is unverified on real hardware: headless Chrome here uses software rendering (about 0.3 fps on Low). Press F in the game to see the meter; change quality in the pause menu.
-- Characters share one mannequin-style body with a smooth, featureless face. They are animated and dressed, but not the painterly look in the concept art; that still needs bespoke models.
+- Rama deforms by automatic skinning, so cloth can stretch at the left shoulder when the bow is raised and a short stub of the original bow remains in his left hand.
+- The rakshasas, Maricha and Tataka still share one mannequin-style body with a smooth, featureless face. They are animated and dressed, but not the painterly look in the concept art; that still needs bespoke models.
 - The golden deer and the flying rakshasas in the vimana section are still simple shapes.
 - Enemies walk in straight lines and can get stuck on temple walls or trees.
 - The golden deer chase needs only one Divya Drishti pulse at the end of its route; earlier pulses just make it flicker.

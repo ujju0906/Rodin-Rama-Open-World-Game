@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { attachRamaBody } from './ramaModel';
 import { Rig, rigReady } from './rig';
 
 /**
@@ -403,99 +404,10 @@ function buildBow(gold: THREE.Material): {
 
 function createRiggedRama(): RamaFigure {
   const f = rigged(0x40669a, 0xd9a441);
-  const rig = f.rig;
-  const hair = std(0x0c0a0a, 0.5);
-  const gold = std(0xd9a441, 0.3, 1);
-  const saffron = new THREE.MeshStandardMaterial({
-    color: 0xe07f1c,
-    roughness: 0.8,
-    side: THREE.DoubleSide,
-  });
-  const bark = new THREE.MeshStandardMaterial({
-    color: 0x7a5a34,
-    roughness: 0.95,
-    side: THREE.DoubleSide,
-  });
-
-  // Hair, topknot and tilak.
-  const head = new THREE.Group();
-  mesh(
-    new THREE.SphereGeometry(0.112, 16, 12, 0, Math.PI * 2, 0, 1.05),
-    hair,
-    0,
-    0.105,
-    -0.01,
-    head,
-  );
-  mesh(new THREE.SphereGeometry(0.105, 14, 10), hair, 0, 0.08, -0.045, head).scale.set(1, 1.1, 0.8);
-  mesh(new THREE.SphereGeometry(0.06, 12, 10), hair, 0, 0.245, -0.02, head);
-  mesh(new THREE.TorusGeometry(0.045, 0.011, 6, 14), gold, 0, 0.2, -0.02, head).rotation.x =
-    Math.PI / 2;
-  mesh(new THREE.BoxGeometry(0.014, 0.045, 0.01), std(0xc8281a, 0.6), 0, 0.13, 0.108, head);
-  for (const s of [-1, 1])
-    mesh(new THREE.CapsuleGeometry(0.03, 0.2, 4, 8), hair, s * 0.085, -0.03, -0.06, head);
-  rig.attach('Head', head);
-
-  // Dhoti: an open skirt of saffron panels from the waist, plus a bark-cloth wrap and sash.
-  const hips = new THREE.Group();
-  mesh(new THREE.CylinderGeometry(0.175, 0.2, 0.16, 16, 1, true), bark, 0, 0.04, 0, hips);
-  mesh(
-    new THREE.CylinderGeometry(0.19, 0.3, 0.62, 18, 3, true, 0.5, Math.PI * 2 - 1.0),
-    saffron,
-    0,
-    -0.3,
-    0,
-    hips,
-  );
-  mesh(new THREE.TorusGeometry(0.185, 0.022, 6, 20), gold, 0, 0.1, 0, hips).rotation.x =
-    Math.PI / 2;
-  const tail = mesh(new THREE.PlaneGeometry(0.16, 0.6), saffron, 0.1, -0.28, 0.2, hips);
-  tail.rotation.x = -0.12;
-  rig.attach('Hips', hips);
-
-  const chest = new THREE.Group();
-  const sash = mesh(new THREE.TorusGeometry(0.165, 0.028, 6, 24), saffron, 0, 0.0, 0.0, chest);
-  sash.rotation.set(Math.PI / 2, 0.7, 0);
-  sash.scale.set(1.12, 0.72, 1.25);
-  const quiver = mesh(
-    new THREE.CylinderGeometry(0.055, 0.045, 0.6, 10),
-    std(0x5a3a1e, 0.6),
-    -0.08,
-    0.06,
-    -0.16,
-    chest,
-  );
-  quiver.rotation.z = -0.4;
-  for (let i = 0; i < 5; i++) {
-    mesh(
-      new THREE.CylinderGeometry(0.006, 0.006, 0.24, 4),
-      gold,
-      -0.02 + i * 0.016,
-      0.4,
-      (i % 2) * 0.02 - 0.01,
-      quiver,
-    );
-    mesh(
-      new THREE.ConeGeometry(0.02, 0.07, 4),
-      std(0xf4e6c8, 0.8),
-      -0.02 + i * 0.016,
-      0.5,
-      (i % 2) * 0.02 - 0.01,
-      quiver,
-    );
-  }
-  mesh(
-    new THREE.TorusGeometry(0.075, 0.012, 6, 16),
-    std(0x7a2f1a, 0.8),
-    0,
-    0.17,
-    0.02,
-    chest,
-  ).rotation.x = Math.PI / 2; // prayer beads
-  rig.attach('Spine2', chest);
-
+  // The body is the Rodin (Hyper3D) model made from the concept art, skinned to the shared skeleton.
+  f.skins.push(attachRamaBody(f.rig));
   // Kodanda is placed at the left hand every frame (see Player.animate).
-  const { bow, string, nocked } = buildBow(gold);
+  const { bow, string, nocked } = buildBow(std(0xd9a441, 0.3, 1));
   f.root.add(bow);
   return { ...f, bow, string, nocked };
 }

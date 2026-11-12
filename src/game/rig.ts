@@ -103,7 +103,7 @@ export class Rig {
   }
 
   /** Turns a bone so that it points along a world direction, blended by `weight`. */
-  private point(name: string, child: string, dir: THREE.Vector3, weight: number): void {
+  point(name: string, child: string, dir: THREE.Vector3, weight: number): void {
     if (weight <= 0.001) return;
     const b = this.bone(name);
     const c = this.bone(child);
