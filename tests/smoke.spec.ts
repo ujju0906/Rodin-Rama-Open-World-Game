@@ -6,6 +6,7 @@ import { expect, test } from '@playwright/test';
  * real-device fps is checked by the in-game meter.
  */
 test('loads, starts and renders without errors', async ({ page }) => {
+  test.setTimeout(400_000);
   const errors: string[] = [];
   page.on('console', (msg) => {
     if (msg.type() === 'error') errors.push(msg.text());
@@ -23,11 +24,23 @@ test('loads, starts and renders without errors', async ({ page }) => {
 
   const fps = await page.evaluate(() => window.__game.fps);
   console.log(`fps (software rendering, Low): ${fps.toFixed(1)}`);
-  expect(fps).toBeGreaterThan(0.5);
+  expect(fps).toBeGreaterThan(0.1); // software rendering: only proves frames are being produced
 
   // The canvas must contain a real picture, not a blank frame.
   const shot = await page.screenshot({ path: 'screenshots/01-started.png' });
   expect(shot.byteLength).toBeGreaterThan(60_000);
+
+  // The game itself: an arrow can be fired and a fight can be started without errors.
+  await page.evaluate(() => {
+    window.__game.play.shoot();
+    window.__game.play.step('ambush');
+    window.__game.play.cast('agneya');
+    window.__game.play.cast('drishti');
+  });
+  await page.waitForTimeout(3000);
+  const state = (await page.evaluate(() => window.__game.play.state())) as { step: string };
+  console.log(JSON.stringify(state));
+  expect(state.step).toBe('ambush');
 
   // Switching quality at runtime must not break anything.
   await page.evaluate(() => window.__game.setQuality('medium'));

@@ -13,17 +13,34 @@
   - Playwright smoke test (`npm test`) and review screenshots (`SHOTS=1 npx playwright test shots`).
 - **Concept art:** generated in Higgsfield (GPT Image 2.6, unlimited allowance). Prompts and links in `ArtRef/concept-art.md`.
 
+- **Phase 2 (2026-11-12): The forest.** 1 x 1 km baked heightfield with river channel, swamp basin, clearings and footpaths; four-layer splat ground (mud, moss, rock, sand) with rain wetness; river and swamp water shader (sky reflection, sun glitter, depth colour, foam, rain chop); about 7,000 instanced trees of three kinds with leaf cards, hanging banyan roots, two LODs and chunk culling; about 16,000 ferns; camera-following grass and swamp reeds; rain and fireflies; hermitage, two lamp shrines, wooden bridge, ruined temple with a real generated maze, swamp idols and standing stones. All textures are generated in code.
+- **Playable game (Phases 3, 4 and parts of 5 and 6, 2026-11-12).**
+  - Rama (procedural placeholder figure): run, sprint, jump, dodge roll, swim, third-person camera with wall avoidance.
+  - Kodanda: hold-to-draw, gravity, glowing trail, arrows stick, headshots, focus slow-motion (draw in the air or right after a dodge).
+  - Astras as data: Agneyastra (fire cone, burn) and Vayavyastra (cyclone that lifts enemies and clears poison); chant rings; a hit breaks the chant.
+  - Divya Drishti pulse: destroys clones, dissolves maya walls, unmasks the golden deer, reveals Tataka in the dark.
+  - Enemies: rakshasa grunt, archer, maya clone, Maricha. State-machine AI with flanking and range keeping.
+  - Story: practice targets, forest shrine and ambush, river shrine, temple maya maze, golden deer chase, Maricha, Tataka (fury, brood, darkness), victory.
+  - HUD (health, focus, astra cooldowns, compass, boss bar, story text), pause menu with controls, quality, volume and sensitivity, save and resume (localStorage), respawn at shrines, photo mode (P).
+  - All sound is synthesised with Web Audio: rain, drone, combat pulse, bow, astras, hits.
+  - Tests: `npm test` runs the smoke test and an end-to-end story test (`tests/play.spec.ts`) that drives every beat through to victory.
+
 ## Next
-- **Phase 2: The forest.** 1 x 1 km heightmap terrain with splat-blended materials, river with water shader, instanced monsoon forest with proper foliage (alpha-card leaves, LODs), rain, hermitage, ruined temple, swamp. Cascaded shadows for the sun.
+- Vimana flight and the storm route (Phase 5, not started).
+- Real character models: Higgsfield image-to-3D with rigging needs credits (balance is 0.5).
+- Astra wheel (radial menu), ledge climbing, skill trees, cutscene cameras, depth of field.
+- Cascaded shadows; tree collision; Rapier physics (installed but not used: movement is a simple kinematic controller on the heightfield).
+- Use the Higgsfield concept art for the title and loading screens once the files are in `/ArtRef`.
+- Phase 7 hosting on a public host (Netlify, Cloudflare Pages or GitHub Pages).
 
 ## Known issues
-- Frame rate has only been measured in headless Chrome with software rendering (about 1 fps there, which is expected without a GPU). 60 fps on a real laptop is not verified yet; check the meter with `?fps`.
-- This cloud workspace cannot download files from Higgsfield's image host, so the concept images are not in `/ArtRef` as files and are not used in the game yet (loading screen background is CSS). Drop the image files into `/ArtRef` to change that.
-- Trees and rocks in the test scene are simple placeholders; Phase 2 replaces them.
-- Shadows use one shadow map that follows the scene focus; cascades come in Phase 2.
-- Depth of field (cutscenes only) is planned for Phase 6.
-- No HDRI file is used: lighting comes from the procedural sky. A Poly Haven HDRI can be added later if wanted.
-- Higgsfield credit balance is 0.5: enough for nothing in 3D. Image allowance ends 2026-11-15.
+- Frame rate is unverified on real hardware: headless Chrome here uses software rendering (about 0.3 fps on Low). Press F in the game to see the meter; change quality in the pause menu.
+- Characters are simple jointed placeholders, not the painterly look in the concept art.
+- You can walk through tree trunks. Enemies walk in straight lines and can get stuck on temple walls.
+- The golden deer chase needs only one Divya Drishti pulse at the end of its route; earlier pulses just make it flicker.
+- Tataka has 720 health, not the 1200 in the design draft (tuned in `src/data/gameplay.ts`).
+- Trees are not cleared around the swamp arena's far edge, so arrows there can be blocked visually but not physically.
+- Concept images are not in `/ArtRef` as files (this workspace cannot download from Higgsfield's host).
 
-## Controls (test scene)
-Drag: look around. T: pause/resume time. [ and ]: change hour. 1 2 3: Low / Medium / Ultra. F: stats.
+## Controls
+W A S D move, mouse look, Shift sprint, Ctrl dodge, Space jump. Hold and release left mouse to shoot (right mouse aims). Hold Q to chant an astra (1 / 2 or Tab to choose). E for Divya Drishti. Esc pauses. P photo mode. F stats. Gamepad is supported.

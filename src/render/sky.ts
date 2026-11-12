@@ -23,6 +23,7 @@ uniform vec3 uMoonDir;
 uniform float uNight;
 uniform float uTime;
 uniform float uCloudCover;
+uniform float uDark;
 
 float hash( vec2 p ) { return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 ); }
 float hash3( vec3 p ) { return fract( sin( dot( p, vec3( 127.1, 311.7, 74.7 ) ) ) * 43758.5453 ); }
@@ -79,7 +80,7 @@ void main() {
   float haze = 1.0 - smoothstep( -0.02, 0.16, d.y );
   col = mix( col, uFog + uSunColor * 0.25 * pow( sd, 5.0 ), haze );
 
-  gl_FragColor = vec4( col, 1.0 );
+  gl_FragColor = vec4( col * ( 1.0 - uDark * 0.94 ), 1.0 );
 }`;
 
 const v3 = (a: readonly number[]): THREE.Vector3 => new THREE.Vector3(a[0], a[1], a[2]);
@@ -138,6 +139,7 @@ export class Sky {
         uNight: { value: 0 },
         uTime: { value: 0 },
         uCloudCover: { value: 0.52 },
+        uDark: { value: 0 },
       },
     });
     this.mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), this.material);

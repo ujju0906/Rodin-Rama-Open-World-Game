@@ -2,13 +2,19 @@ import * as THREE from 'three';
 import { Loop, nextFrame } from './core/loop';
 import { loadSettings, saveSettings } from './core/settings';
 import { ATMOSPHERE } from './data/atmosphere';
-import { QUALITY, QUALITY_ORDER, type QualityName } from './data/quality';
+import { QUALITY, type QualityName } from './data/quality';
 import { SkyEnvironment } from './render/environment';
 import { installHeightFog } from './render/fog';
 import { createPost, type PostStack } from './render/post';
 import { applyRendererQuality, createRenderer } from './render/renderer';
 import { Sky } from './render/sky';
-import { buildTestScene, heightAt } from './render/testScene';
+import { GameAudio } from './core/audio';
+import { Input } from './core/input';
+import { FlyCamera } from './game/flyCamera';
+import { Game } from './game/game';
+import { Hud } from './ui/hud';
+import { World } from './render/world';
+import { VIEWPOINTS } from './data/world';
 import { FpsMeter } from './ui/fpsMeter';
 import { LoadingScreen } from './ui/loadingScreen';
 
@@ -20,7 +26,11 @@ interface GameDebug {
   hour: number;
   setHour(h: number): void;
   setQuality(q: QualityName): void;
-  setOrbit(angle: number): void;
+  setView(i: number): void;
+  setRain(amount: number): void;
+  stats(): { trees: number; ferns: number; calls: number; tris: number };
+  play: Game['debug'];
+  photo(on: boolean): void;
   setCycle(on: boolean): void;
 }
 declare global {
@@ -58,8 +68,8 @@ async function boot(): Promise<void> {
 
   const sun = new THREE.DirectionalLight(0xffffff, 1);
   sun.castShadow = true;
-  sun.shadow.camera.left = sun.shadow.camera.bottom = -75;
-  sun.shadow.camera.right = sun.shadow.camera.top = 75;
+  sun.shadow.camera.left = sun.shadow.camera.bottom = -95;
+  sun.shadow.camera.right = sun.shadow.camera.top = 95;
   sun.shadow.camera.near = 1;
   sun.shadow.camera.far = 420;
   sun.shadow.bias = -0.0004;
@@ -79,11 +89,18 @@ async function boot(): Promise<void> {
   sunDisc.frustumCulled = false;
   scene.add(sunDisc);
 
-  loading.setProgress(0.45, 'Growing the forest');
-  await nextFrame();
-  const world = buildTestScene(scene);
+  const world = new World();
+  await world.build(scene, (f, label) => loading.setProgress(f, label));
+  const fly = new FlyCamera(camera, (x, z) => world.hf.heightAt(x, z));
+  fly.attach(canvas);
 
-  loading.setProgress(0.7, 'Calling the mist');
+  const input = new Input(canvas);
+  const audio = new GameAudio();
+  const hud = new Hud();
+  const game = new Game(scene, camera, world, input, audio, hud);
+  let photo = false;
+
+  loading.setProgress(0.75, 'Calling the mist');
   await nextFrame();
 
   let post: PostStack | null = null;
@@ -96,7 +113,8 @@ async function boot(): Promise<void> {
     sun.shadow.map?.dispose();
     sun.shadow.map = null;
     sky.setCloudOctaves(quality.cloudOctaves);
-    world.rebuildScatter(quality.scatterDensity, renderer.getPixelRatio());
+    world.applyQuality(quality.scatterDensity, renderer.getPixelRatio());
+    game.fx.setPixelRatio(renderer.getPixelRatio());
     post?.dispose();
     post = createPost(renderer, scene, camera, sunDisc, quality);
     resize();
@@ -117,10 +135,6 @@ async function boot(): Promise<void> {
   // Clock and camera state.
   let hour: number = ATMOSPHERE.startHour;
   let cycle = true;
-  let orbit = 0.9;
-  let orbitAuto = true;
-  let dragging = false;
-  let dragX = 0;
 
   const meter = new FpsMeter();
   meter.visible = import.meta.env.DEV || params.has('fps');
@@ -135,54 +149,94 @@ async function boot(): Promise<void> {
       hour = h;
     },
     setQuality: (q) => applyQuality(q),
-    setOrbit: (a) => {
-      orbit = a;
-      orbitAuto = false;
+    setView: (i) => {
+      photo = true;
+      hud.show(false);
+      fly.setView(i % VIEWPOINTS.length, false);
     },
+    play: game.debug,
+    photo: (on) => {
+      photo = on;
+      hud.show(!on && game.active);
+    },
+    setRain: (a) => {
+      world.weather.rainTarget = a;
+      world.weather.rain = a;
+    },
+    stats: () => ({
+      trees: world.forest.treeCount,
+      ferns: world.forest.fernCount,
+      calls: renderer.info.render.calls,
+      tris: renderer.info.render.triangles,
+    }),
     setCycle: (on) => {
       cycle = on;
     },
   };
 
-  const camPos = new THREE.Vector3();
-  const update = (dt: number, elapsed: number): void => {
+  const focus = new THREE.Vector3();
+  const swampFog = new THREE.Color(0.2, 0.3, 0.17);
+  let worldTime = 0;
+  const update = (rawDt: number, elapsed: number): void => {
+    input.poll();
+    let scale = 1;
+    if (game.active && !photo) scale = game.update(rawDt, elapsed);
+    else fly.update(rawDt, elapsed);
+    const dt = rawDt * scale;
+    worldTime += dt;
+    const dark = game.darkness;
     if (cycle) hour = (hour + dt * ATMOSPHERE.cycleSpeed) % 24;
     sky.setHour(hour);
     const s = sky.state;
+    const rain = world.weather.rain;
+    sky.material.uniforms.uCloudCover!.value = 0.5 + rain * 0.3;
+    sky.material.uniforms.uDark!.value = dark;
 
-    // Slow cinematic orbit around the shrine.
-    if (orbitAuto && !dragging) orbit += dt * 0.035;
-    const radius = 27 + Math.sin(elapsed * 0.05) * 5;
-    camPos.set(Math.cos(orbit) * radius, 0, Math.sin(orbit) * radius);
-    camPos.y = Math.max(heightAt(camPos.x, camPos.z) + 2.2, 3.2 + Math.sin(elapsed * 0.07) * 1.2);
-    camera.position.copy(camPos);
-    camera.lookAt(world.focus.x, world.focus.y + 1.2, world.focus.z);
-
+    // The shadow map follows the camera, snapped to whole texels to avoid shimmer.
+    if (game.active && !photo)
+      focus
+        .copy(game.player.pos)
+        .addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 30);
+    else
+      focus
+        .copy(camera.position)
+        .addScaledVector(camera.getWorldDirection(new THREE.Vector3()), 45);
+    const texel = 190 / quality.shadowMapSize;
+    focus.set(
+      Math.round(focus.x / texel) * texel,
+      world.hf.heightAt(focus.x, focus.z),
+      Math.round(focus.z / texel) * texel,
+    );
     sun.color.copy(s.lightColor);
-    sun.intensity = s.lightIntensity;
-    sun.target.position.copy(world.focus);
-    sun.position.copy(world.focus).addScaledVector(s.lightDir, 180);
-    scene.environmentIntensity = THREE.MathUtils.lerp(0.95, 0.5, s.night);
+    sun.intensity = s.lightIntensity * (1 - rain * 0.45) * (1 - dark * 0.92);
+    sun.target.position.copy(focus);
+    sun.position.copy(focus).addScaledVector(s.lightDir, 200);
+    scene.environmentIntensity = THREE.MathUtils.lerp(0.95, 0.5, s.night) * (1 - dark * 0.9);
 
-    fog.color.copy(s.fogColor);
-    fog.density = s.fogDensity;
+    const swamp = world.swampNearness(camera.position);
+    fog.color
+      .copy(s.fogColor)
+      .lerp(swampFog.clone().multiplyScalar(0.25 + 0.75 * (1 - s.night)), swamp * 0.7);
+    fog.color.multiplyScalar(1 - dark * 0.93);
+    fog.density = s.fogDensity * (1 + rain * 0.9 + swamp * 1.3 + dark * 3.5);
 
     const sunUp = THREE.MathUtils.smoothstep(s.sunDir.y, -0.06, 0.08);
     sunDisc.position.copy(camera.position).addScaledVector(s.sunDir, 2600);
     (sunDisc.material as THREE.MeshBasicMaterial).color
       .copy(s.lightColor)
-      .multiplyScalar(sunUp * (1 - s.night) * 2.4);
+      .multiplyScalar(sunUp * (1 - s.night) * 2.4 * (1 - rain * 0.5));
 
-    sky.update(elapsed, camera);
+    sky.update(worldTime, camera);
     env.update(quality.envRefreshHours);
-    world.update(dt, elapsed, s);
+    world.update(dt, worldTime, camera.position, sky);
 
     renderer.info.reset();
-    post!.render(dt);
+    post!.render(rawDt);
+    input.endFrame();
 
     window.__game.fps = loop.fps;
     window.__game.hour = hour;
-    meter.update(dt, {
+    meter.update(rawDt, {
       fps: loop.fps,
       ms: loop.frameMs,
       calls: renderer.info.render.calls,
@@ -220,35 +274,49 @@ async function boot(): Promise<void> {
   window.__game.ready = true;
   await loading.waitForBegin();
   loading.hide();
+  audio.start();
+  world.weather.rainTarget = 0.35;
+  game.getQuality = () => qualityName;
+  game.onQuality = (q) => {
+    applyQuality(q);
+    saveSettings({ ...loadSettings(), quality: q });
+  };
+  game.start();
+  input.requestLock();
   window.__game.started = true;
-  hint.textContent =
-    'Drag: look around   T: time flow   [ ]: change hour   1 2 3: quality   F: stats';
+  hint.textContent = 'Click to take control   ·   Esc: pause and controls';
   setTimeout(() => (hint.style.transition = 'opacity 2s'), 0);
-  setTimeout(() => (hint.style.opacity = '0'), 9000);
+  setTimeout(() => (hint.style.opacity = '0'), 8000);
 
-  // Dev / test-scene controls.
+  canvas.addEventListener('click', () => {
+    if (game.active && !game.paused && !input.locked && !photo) input.requestLock();
+  });
+  document.addEventListener('pointerlockchange', () => {
+    if (document.pointerLockElement !== canvas && game.active && !photo) game.pause();
+  });
   window.addEventListener('keydown', (e) => {
-    if (e.key === 't' || e.key === 'T') cycle = !cycle;
-    else if (e.key === '[') hour = (hour + 23.5) % 24;
-    else if (e.key === ']') hour = (hour + 0.5) % 24;
-    else if (e.key === 'f' || e.key === 'F') meter.visible = !meter.visible;
-    else if (e.key >= '1' && e.key <= '3') {
-      const name = QUALITY_ORDER[Number(e.key) - 1]!;
-      applyQuality(name);
-      saveSettings({ ...loadSettings(), quality: name });
+    const k = e.key.toLowerCase();
+    if (k === 'f') meter.visible = !meter.visible;
+    else if (k === 'p' && !game.paused) {
+      // Photo mode: free camera, no HUD.
+      photo = !photo;
+      hud.show(!photo);
+      if (photo) {
+        document.exitPointerLock?.();
+        fly.position.copy(camera.position);
+        fly.yaw = game.camYaw;
+        fly.pitch = game.camPitch;
+        hint.textContent =
+          'Photo mode   ·   Drag: look   WASD QE: move   Shift: fast   V: viewpoints   T [ ]: time   R: rain   P: back';
+        hint.style.opacity = '1';
+      } else hint.style.opacity = '0';
+    } else if (photo) {
+      if (k === 't') cycle = !cycle;
+      else if (k === '[') hour = (hour + 23.5) % 24;
+      else if (k === ']') hour = (hour + 0.5) % 24;
+      else if (k === 'r') world.weather.rainTarget = world.weather.rainTarget > 0.05 ? 0 : 0.7;
     }
   });
-  canvas.addEventListener('pointerdown', (e) => {
-    dragging = true;
-    dragX = e.clientX;
-    canvas.setPointerCapture(e.pointerId);
-  });
-  canvas.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
-    orbit -= (e.clientX - dragX) * 0.005;
-    dragX = e.clientX;
-  });
-  canvas.addEventListener('pointerup', () => (dragging = false));
 }
 
 boot().catch((err: unknown) => {
