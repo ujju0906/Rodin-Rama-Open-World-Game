@@ -1,13 +1,24 @@
-import numpy as np, base64, struct
-d=np.load('/tmp/rama_raw.npz'); V,VT,F=d['V'],d['VT'],d['F']
-key=F[:,:,0]*600000+F[:,:,1]
+# Prepares a Rodin (Hyper3D) OBJ for the game: optional bow cut, reduction, packing to base64.
+# Usage: python3 scripts/prep-model.py <obj> <out.ts> <cell size in metres> [cutbow]
+import numpy as np, base64, struct, sys
+OBJ, OUT, CELL = sys.argv[1], sys.argv[2], float(sys.argv[3]); CUT = len(sys.argv) > 4
+V=[];VT=[];F=[]
+with open(OBJ) as f:
+    for l in f:
+        if l[0]=='v':
+            if l[1]==' ': V.append(l.split()[1:4])
+            elif l[1]=='t': VT.append(l.split()[1:3])
+        elif l[0]=='f':
+            F.append([q.split('/')[:2] for q in l.split()[1:4]])
+V=np.array(V,np.float32); VT=np.array(VT,np.float32); F=np.array(F,np.int64)-1
+key=F[:,:,0]*1000000+F[:,:,1]
 uk,inv=np.unique(key.reshape(-1),return_inverse=True)
-cv=(uk//600000).astype(np.int64); ct=(uk%600000).astype(np.int64)
+cv=(uk//1000000).astype(np.int64); ct=(uk%1000000).astype(np.int64)
 P=V[cv]; UV=VT[ct]; Fi=inv.reshape(-1,3)
 x,y=P[:,0],P[:,1]
 thr=np.where(y<0.6,0.235,np.where(y<0.93,0.28,np.where(y<1.12,9.0,0.30)))
-Fi=Fi[~(x>thr)[Fi].all(1)]
-cell=0.011
+if CUT: Fi=Fi[~(x>thr)[Fi].all(1)]
+cell=CELL
 cs=np.where(y>1.5,cell*0.5,cell)
 c=np.floor(P/cs[:,None]).astype(np.int64)
 pk=((c[:,0]+2000)*4000+(c[:,1]+2000))*4000+(c[:,2]+2000)+(y>1.5).astype(np.int64)*10**12
@@ -28,4 +39,4 @@ mn=NP.min(0); mx=NP.max(0)
 blob=struct.pack('<II6f',len(NP),len(NF),*mn,*mx)+np.round((NP-mn)/(mx-mn)*65535).astype(np.uint16).tobytes()+np.round(np.clip(NUV,0,1)*65535).astype(np.uint16).tobytes()+np.round(N*127).astype(np.int8).tobytes()
 blob+=b'\0'*((-len(blob))%4)+NF.astype(np.uint32).tobytes()
 print(len(blob)/1e6,'MB')
-open('/home/claude/ramayana/src/assets/ramaMesh.ts','w').write("// Generated from the Rodin (Hyper3D) Rama model by scripts/prep-rama.py. Do not edit.\nexport default '"+base64.b64encode(blob).decode()+"';\n")
+open(OUT,'w').write("// Generated from the Rodin (Hyper3D) Rama model by scripts/prep-model.py. Do not edit.\nexport default '"+base64.b64encode(blob).decode()+"';\n")

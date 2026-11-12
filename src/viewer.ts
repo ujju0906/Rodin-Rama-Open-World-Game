@@ -27,8 +27,8 @@ async function main(): Promise<void> {
     camera.position.set(-2.9, 1.5, 6.2);
     camera.lookAt(-2.9, 1.05, 0);
   } else {
-    camera.position.set(2.6, 2.6, 10.5);
-    camera.lookAt(2.6, 2.2, 0);
+    camera.position.set(3.4, 2.4, 6.5);
+    camera.lookAt(3.4, 2.0, -1.5);
   }
 
   await loadRig();

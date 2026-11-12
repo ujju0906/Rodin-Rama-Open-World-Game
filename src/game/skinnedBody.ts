@@ -1,14 +1,35 @@
 import * as THREE from 'three';
-import meshData from '../assets/ramaMesh';
 import type { Rig } from './rig';
 
+export interface BodySpec {
+  /** Cache key: one preparation per model, shared by every character that uses it. */
+  key: string;
+  /** Packed mesh (see scripts/prep-model.py). */
+  data: string;
+  /** Texture file prefix in public/art (`<tex>_diffuse.jpg`, `_normal.jpg`, `_orm.jpg`); omit for a mesh with baked vertex colours. */
+  tex?: string;
+  /** Height of the top of the skull in the model's own units (below any topknot or crown). */
+  skullTop: number;
+  /** Arm directions of the statue's pose: [upper arm, forearm] for the right and left arm. */
+  arms: { right: [THREE.Vector3, THREE.Vector3]; left: [THREE.Vector3, THREE.Vector3] };
+  /** Leg directions (thigh and shin share one) when the statue stands with its feet apart. */
+  legs?: { right: THREE.Vector3; left: THREE.Vector3 };
+  /** Cloth closer to the centre line than this never follows the arms. */
+  torsoHalfWidth: number;
+}
+
+const cache = new Map<
+  string,
+  { geo: THREE.BufferGeometry; inverses: THREE.Matrix4[]; mat: THREE.MeshStandardMaterial }
+>();
+
 /**
- * Rama's body: the Rodin (Hyper3D) model generated from the concept art.
+ * A character body made from a Rodin (Hyper3D) model: the Rodin (Hyper3D) model generated from the concept art.
  * The model arrives as a static statue, so it is skinned here at load time:
  * the animated skeleton is posed like the statue, and every statue vertex takes the
  * bone weights of the nearest vertices on the reference body.
  */
-function decode(): THREE.BufferGeometry {
+function decode(meshData: string, colors: boolean): THREE.BufferGeometry {
   const bytes = Uint8Array.from(atob(meshData), (c) => c.charCodeAt(0));
   const view = new DataView(bytes.buffer);
   const n = view.getUint32(0, true);
@@ -34,23 +55,30 @@ function decode(): THREE.BufferGeometry {
   for (let i = 0; i < n * 2; i++) uv[i] = uvq[i]! / 65535;
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  if (colors) {
+    // The same four bytes per vertex hold an sRGB colour instead of texture coordinates.
+    const cb = new Uint8Array(bytes.buffer, 32 + n * 6, n * 4);
+    const col = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++)
+      for (let k = 0; k < 3; k++) col[i * 3 + k] = Math.pow(cb[i * 4 + k]! / 255, 2.2);
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  } else g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
   g.setIndex(new THREE.BufferAttribute(index.slice(), 1));
   return g;
 }
 
-function material(): THREE.MeshStandardMaterial {
+function material(tex: string): THREE.MeshStandardMaterial {
   const load = (name: string, srgb: boolean): THREE.Texture => {
     const t = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}art/${name}.jpg`);
     if (srgb) t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = 4;
     return t;
   };
-  const orm = load('rama_orm', false);
+  const orm = load(`${tex}_orm`, false);
   return new THREE.MeshStandardMaterial({
-    map: load('rama_diffuse', true),
-    normalMap: load('rama_normal', false),
+    map: load(`${tex}_diffuse`, true),
+    normalMap: load(`${tex}_normal`, false),
     roughnessMap: orm,
     metalnessMap: orm,
     roughness: 1,
@@ -58,23 +86,67 @@ function material(): THREE.MeshStandardMaterial {
   });
 }
 
-/** Skins the statue to `rig` and returns its material (for hit flashes). */
-export function attachRamaBody(rig: Rig): THREE.MeshStandardMaterial {
-  const geo = decode();
+/** Skins the statue to `rig` and returns this character's own material (for hit flashes and tints). */
+export function attachBody(rig: Rig, spec: BodySpec): THREE.MeshStandardMaterial {
+  const scene = rig.scene;
+  const sources: THREE.SkinnedMesh[] = [];
+  scene.traverse((o) => o instanceof THREE.SkinnedMesh && sources.push(o));
+  const bones = sources[0]!.skeleton.bones;
+  for (const m of sources) m.visible = false;
+
+  let prepared = cache.get(spec.key);
+  if (!prepared) {
+    const geo = prepare(rig, spec, sources, bones);
+    const inverses = bones.map((b) => b.matrixWorld.clone().invert());
+    prepared = {
+      geo,
+      inverses,
+      mat: spec.tex
+        ? material(spec.tex)
+        : new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0.1 }),
+    };
+    cache.set(spec.key, prepared);
+  }
+  // Bind with the statue pose's bone transforms as the bind pose (the same for every instance).
+  const mat = prepared.mat.clone();
+  const mesh = new THREE.SkinnedMesh(prepared.geo, mat);
+  mesh.castShadow = true;
+  mesh.frustumCulled = false;
+  scene.add(mesh);
+  mesh.bind(
+    new THREE.Skeleton(
+      bones,
+      prepared.inverses.map((m) => m.clone()),
+    ),
+    new THREE.Matrix4(),
+  );
+  return mat;
+}
+
+function prepare(
+  rig: Rig,
+  spec: BodySpec,
+  sources: THREE.SkinnedMesh[],
+  bones: THREE.Bone[],
+): THREE.BufferGeometry {
+  const geo = decode(spec.data, !spec.tex);
   const scene = rig.scene;
 
   // 1. Pose the skeleton like the statue: standing, arms down and a little out.
   rig.update(0, 0, 0);
-  rig.point('RightArm', 'RightForeArm', new THREE.Vector3(-0.4, -0.92, 0.02), 1);
-  rig.point('RightForeArm', 'RightHand', new THREE.Vector3(-0.42, -0.9, 0.12), 1);
-  rig.point('LeftArm', 'LeftForeArm', new THREE.Vector3(0.3, -0.95, 0.02), 1);
-  rig.point('LeftForeArm', 'LeftHand', new THREE.Vector3(0.3, -0.95, 0.1), 1);
+  rig.point('RightArm', 'RightForeArm', spec.arms.right[0], 1);
+  rig.point('RightForeArm', 'RightHand', spec.arms.right[1], 1);
+  rig.point('LeftArm', 'LeftForeArm', spec.arms.left[0], 1);
+  rig.point('LeftForeArm', 'LeftHand', spec.arms.left[1], 1);
+  if (spec.legs) {
+    rig.point('RightUpLeg', 'RightLeg', spec.legs.right, 1);
+    rig.point('RightLeg', 'RightFoot', spec.legs.right, 1);
+    rig.point('LeftUpLeg', 'LeftLeg', spec.legs.left, 1);
+    rig.point('LeftLeg', 'LeftFoot', spec.legs.left, 1);
+  }
   scene.updateMatrixWorld(true);
 
   // 2. Collect the reference body's vertices in that pose, with their bone weights.
-  const sources: THREE.SkinnedMesh[] = [];
-  scene.traverse((o) => o instanceof THREE.SkinnedMesh && sources.push(o));
-  const bones = sources[0]!.skeleton.bones;
   const boneIndex = new Map(bones.map((b, i) => [b, i]));
   const ref: { p: THREE.Vector3; idx: number[]; w: number[] }[] = [];
   for (const m of sources) {
@@ -96,18 +168,17 @@ export function attachRamaBody(rig: Rig): THREE.MeshStandardMaterial {
       }
       ref.push({ p, idx, w });
     }
-    m.visible = false;
   }
 
   // 3. Scale and centre the statue on the skeleton (skull top to skull top, head over head).
   const pos = geo.attributes.position as THREE.BufferAttribute;
   const headTop = rig.worldPos('HeadTop_End', new THREE.Vector3());
-  const scale = headTop.y / 1.79;
+  const scale = headTop.y / spec.skullTop;
   let hx = 0;
   let hz = 0;
   let hn = 0;
   for (let i = 0; i < pos.count; i++) {
-    if (pos.getY(i) > 1.62 && pos.getY(i) < 1.78) {
+    if (pos.getY(i) > spec.skullTop - 0.17 && pos.getY(i) < spec.skullTop - 0.01) {
       hx += pos.getX(i);
       hz += pos.getZ(i);
       hn++;
@@ -164,7 +235,7 @@ export function attachRamaBody(rig: Rig): THREE.MeshStandardMaterial {
       r.idx.forEach((b, n) => acc.set(b, (acc.get(b) ?? 0) + r.w[n]! * k));
     }
     // Cloth that hangs in front of or behind the torso must not follow the arms, or it fans out when the bow is raised.
-    if (Math.abs(x - ox) < 0.17) {
+    if (Math.abs(x - ox) < spec.torsoHalfWidth) {
       let moved = 0;
       for (const b of armBones) {
         moved += acc.get(b) ?? 0;
@@ -183,13 +254,5 @@ export function attachRamaBody(rig: Rig): THREE.MeshStandardMaterial {
   geo.setAttribute('skinIndex', new THREE.BufferAttribute(skinIndex, 4));
   geo.setAttribute('skinWeight', new THREE.BufferAttribute(skinWeight, 4));
 
-  // 5. Bind in the current pose: the bones' present transforms become the statue's bind pose.
-  const mat = material();
-  const mesh = new THREE.SkinnedMesh(geo, mat);
-  mesh.castShadow = true;
-  mesh.frustumCulled = false;
-  scene.add(mesh);
-  mesh.updateMatrixWorld(true);
-  mesh.bind(new THREE.Skeleton(bones), mesh.matrixWorld);
-  return mat;
+  return geo;
 }

@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { attachRamaBody } from './ramaModel';
+import tatakaMesh from '../assets/tatakaMesh';
+import ramaMesh from '../assets/ramaMesh';
+import { attachBody, type BodySpec } from './skinnedBody';
 import { Rig, rigReady } from './rig';
 
 /**
@@ -359,6 +361,30 @@ export function createTarget(): THREE.Group {
 
 // ---------------------------------------------------------------- rigged versions
 
+const V3 = (x: number, y: number, z: number): THREE.Vector3 => new THREE.Vector3(x, y, z);
+/** Rodin (Hyper3D) bodies: how each statue stands, so the skeleton can be matched to it. */
+const RAMA_BODY: BodySpec = {
+  key: 'rama',
+  data: ramaMesh,
+  tex: 'rama',
+  skullTop: 1.79,
+  arms: {
+    right: [V3(-0.4, -0.92, 0.02), V3(-0.42, -0.9, 0.12)],
+    left: [V3(0.3, -0.95, 0.02), V3(0.3, -0.95, 0.1)],
+  },
+  torsoHalfWidth: 0.17,
+};
+const TATAKA_BODY: BodySpec = {
+  key: 'tataka',
+  data: tatakaMesh,
+  skullTop: 1.8,
+  arms: {
+    right: [V3(-0.42, -0.9, 0.02), V3(-0.4, -0.9, 0.12)],
+    left: [V3(0.42, -0.9, 0.02), V3(0.4, -0.9, 0.12)],
+  },
+  torsoHalfWidth: 0.22,
+};
+
 function buildBow(gold: THREE.Material): {
   bow: THREE.Group;
   string: THREE.Mesh;
@@ -405,7 +431,7 @@ function buildBow(gold: THREE.Material): {
 function createRiggedRama(): RamaFigure {
   const f = rigged(0x40669a, 0xd9a441);
   // The body is the Rodin (Hyper3D) model made from the concept art, skinned to the shared skeleton.
-  f.skins.push(attachRamaBody(f.rig));
+  f.skins.push(attachBody(f.rig, RAMA_BODY));
   // Kodanda is placed at the left hand every frame (see Player.animate).
   const { bow, string, nocked } = buildBow(std(0xd9a441, 0.3, 1));
   f.root.add(bow);
@@ -494,86 +520,8 @@ function createRiggedRakshasa(kind: 'grunt' | 'archer' | 'maricha'): Figure {
 }
 
 function createRiggedTataka(): Figure {
-  const f = rigged(0x55565a, 0x8a1a0a, new THREE.Color(1.9, 0.28, 0.06));
-  const rig = f.rig;
-  const bronze = std(0x9c6a2c, 0.35, 1);
-  const hairMat = std(0x15100e, 0.9);
-  const bone = std(0xd6ccb2, 0.5);
-  const head = new THREE.Group();
-  for (let i = 0; i < 18; i++) {
-    const a = (i / 18) * Math.PI * 2;
-    const len = 0.5 + (i % 4) * 0.14;
-    if (Math.sin(a) > 0.35) continue; // keep the face clear
-    const lock = mesh(
-      new THREE.ConeGeometry(0.045, len, 6),
-      hairMat,
-      Math.cos(a) * 0.11,
-      0.1 - len * 0.42,
-      Math.sin(a) * 0.11 - 0.03,
-      head,
-    );
-    lock.rotation.set(Math.sin(a) * 0.35 + Math.PI, 0, -Math.cos(a) * 0.35);
-  }
-  mesh(
-    new THREE.SphereGeometry(0.114, 12, 10, 0, Math.PI * 2, 0, 1.0),
-    hairMat,
-    0,
-    0.105,
-    -0.01,
-    head,
-  );
-  mesh(new THREE.ConeGeometry(0.05, 0.14, 8), bronze, 0, 0.26, 0.02, head);
-  for (const s of [-1, 1]) {
-    mesh(
-      new THREE.SphereGeometry(0.024, 6, 6),
-      new THREE.MeshBasicMaterial({ color: new THREE.Color(6, 0.8, 0.1), fog: false }),
-      s * 0.042,
-      0.088,
-      0.1,
-      head,
-    );
-    mesh(new THREE.ConeGeometry(0.014, 0.07, 6), bone, s * 0.055, 0.0, 0.095, head).rotation.z =
-      s * 0.5;
-    mesh(new THREE.TorusGeometry(0.035, 0.008, 5, 10), bronze, s * 0.115, 0.02, 0.0, head);
-  }
-  rig.attach('Head', head);
-  const robe = new THREE.MeshStandardMaterial({
-    color: 0x241820,
-    roughness: 0.9,
-    side: THREE.DoubleSide,
-  });
-  const hips = new THREE.Group();
-  mesh(
-    new THREE.CylinderGeometry(0.21, 0.42, 0.85, 18, 2, true, 0.4, Math.PI * 2 - 0.8),
-    robe,
-    0,
-    -0.4,
-    0,
-    hips,
-  );
-  mesh(
-    new THREE.CylinderGeometry(0.22, 0.34, 0.4, 18, 1, true),
-    new THREE.MeshStandardMaterial({ color: 0x6a1420, roughness: 0.85, side: THREE.DoubleSide }),
-    0,
-    -0.16,
-    0,
-    hips,
-  );
-  mesh(new THREE.TorusGeometry(0.215, 0.04, 6, 20), bronze, 0, 0.06, 0, hips).rotation.x =
-    Math.PI / 2;
-  mesh(new THREE.SphereGeometry(0.075, 10, 8), bronze, 0, 0.04, 0.21, hips);
-  rig.attach('Hips', hips);
-  const chest = new THREE.Group();
-  for (const s of [-1, 1])
-    mesh(
-      new THREE.SphereGeometry(0.14, 12, 10, 0, Math.PI * 2, 0, 1.6),
-      bronze,
-      s * 0.21,
-      0.12,
-      0,
-      chest,
-    );
-  mesh(new THREE.TorusGeometry(0.13, 0.014, 6, 18), bronze, 0, 0.14, 0.06, chest).rotation.x = 1.2;
-  rig.attach('Spine2', chest);
+  const f = rigged(0x55565a, 0x8a1a0a);
+  // The body is the Rodin (Hyper3D) Tataka model with its texture baked into vertex colours.
+  f.skins.push(attachBody(f.rig, TATAKA_BODY));
   return f;
 }
