@@ -400,7 +400,7 @@ export class Game {
     const id = STEPS[i]!.id;
     if (id !== 'practice') for (const t of this.targets) t.alive = false;
     if (id === 'ambush')
-      this.spawnGroup(POI.firstShrine.x, POI.firstShrine.z, ['grunt', 'grunt', 'grunt'], 13);
+      this.spawnGroup(POI.firstShrine.x, POI.firstShrine.z, ['grunt', 'grunt', 'grunt'], 24); // far enough to finish a first chant
     if (id === 'riverFight')
       this.spawnGroup(
         POI.riverShrine.x,
@@ -610,12 +610,30 @@ export class Game {
       this.flash.color.setRGB(1, 0.5, 0.2);
       this.flash.intensity = 900;
       this.flash.position.copy(from).addScaledVector(dir, 6);
+      // The fire catches: grass and undergrowth in the cone burn for a few seconds.
+      const flat = new THREE.Vector3(dir.x, 0, dir.z).normalize();
+      const side = new THREE.Vector3(-flat.z, 0, flat.x);
+      for (let i = 0; i < 14; i++) {
+        const d = 3 + Math.random() * (def.range - 4);
+        const fp = this.player.pos
+          .clone()
+          .addScaledVector(flat, d)
+          .addScaledVector(side, (Math.random() - 0.5) * d * 0.8);
+        if (this.col.inWater(fp.x, fp.z)) continue;
+        fp.y = this.col.groundAt(fp.x, fp.z);
+        this.fires.push({ pos: fp, t: 5 + Math.random() * 3 });
+      }
     } else if (def.shape === 'cyclone') {
       this.audio.play('wind');
       const flat = new THREE.Vector3(dir.x, 0, dir.z).normalize();
       const p = this.player.pos.clone().addScaledVector(flat, 12);
       p.y = this.col.groundAt(p.x, p.z);
       this.cyclone = { pos: p, t: def.duration };
+      // The wind puts out fires it passes over and blows the mist away for a while.
+      this.fires = this.fires.filter(
+        (f) => Math.hypot(f.pos.x - p.x, f.pos.z - p.z) > def.size + 4,
+      );
+      this.fogClearT = 10;
       for (const h of this.hittables()) {
         if (!h.alive || Math.hypot(h.pos.x - p.x, h.pos.z - p.z) > def.size + h.radius) continue;
         h.hit(def.damage, false, flat);
@@ -1041,6 +1059,56 @@ export class Game {
     }
     this.flash.intensity *= Math.max(0, 1 - dt * 5);
 
+    // Burning ground left by the Agneyastra.
+    this.fogClearT = Math.max(0, this.fogClearT - gdt);
+    if (this.fires.length) {
+      const centre = new THREE.Vector3();
+      for (const f of this.fires) {
+        f.t -= gdt;
+        centre.add(f.pos);
+        const k = Math.min(1, f.t / 2);
+        for (let i = 0; i < 4; i++) {
+          this.fx.emit(
+            f.pos
+              .clone()
+              .add(
+                new THREE.Vector3(
+                  (Math.random() - 0.5) * 1.6,
+                  Math.random() * 0.3,
+                  (Math.random() - 0.5) * 1.6,
+                ),
+              ),
+            new THREE.Vector3(
+              (Math.random() - 0.5) * 0.6,
+              1.6 + Math.random() * 1.6,
+              (Math.random() - 0.5) * 0.6,
+            ),
+            0.5 + Math.random() * 0.5,
+            [3.4 * k, 1.1 * k, 0.18 * k],
+            0.28 + Math.random() * 0.3,
+            -1.5,
+            0.8,
+          );
+        }
+        for (const e of this.enemies)
+          if (e.alive && Math.hypot(e.pos.x - f.pos.x, e.pos.z - f.pos.z) < 1.8)
+            e.burn = Math.max(e.burn, 1);
+        if (
+          this.boss?.alive &&
+          Math.hypot(this.boss.pos.x - f.pos.x, this.boss.pos.z - f.pos.z) < 3
+        )
+          this.boss.burn = Math.max(this.boss.burn, 1);
+      }
+      centre.multiplyScalar(1 / this.fires.length).y += 1.5;
+      this.flash.color.setRGB(1, 0.45, 0.15);
+      this.flash.position.copy(centre);
+      this.flash.intensity = Math.max(
+        this.flash.intensity,
+        60 + 12 * this.fires.length + 20 * Math.sin(elapsed * 23),
+      );
+      this.fires = this.fires.filter((f) => f.t > 0);
+    }
+
     // Cyclone column.
     if (this.cyclone) {
       const c = this.cyclone;
@@ -1184,6 +1252,14 @@ export class Game {
     }
   }
 
+  private fires: { pos: THREE.Vector3; t: number }[] = [];
+  private fogClearT = 0;
+
+  /** 0..1: how much the Vayavyastra has blown the mist away (fades back over the last seconds). */
+  get fogClear(): number {
+    return Math.min(1, this.fogClearT / 3);
+  }
+
   /** How dark the boss wants the world (0..1); main.ts applies it to light and fog. */
   get darkness(): number {
     return Math.max(
@@ -1291,8 +1367,8 @@ export class Game {
     const cam = this.camera;
     this.aimBlend +=
       ((p.drawing || p.aiming || this.chantT > 0 ? 1 : 0) - this.aimBlend) * Math.min(1, dt * 8);
-    const dist = THREE.MathUtils.lerp(4.6, 2.3, this.aimBlend);
-    const side = THREE.MathUtils.lerp(0.5, 0.8, this.aimBlend);
+    const dist = THREE.MathUtils.lerp(4.6, 3.1, this.aimBlend);
+    const side = THREE.MathUtils.lerp(0.5, 0.95, this.aimBlend);
     cam.rotation.set(this.camPitch, this.camYaw, 0, 'YXZ');
     const fwd = cam.getWorldDirection(new THREE.Vector3());
     const right = new THREE.Vector3(-fwd.z, 0, fwd.x).normalize();
@@ -1363,12 +1439,19 @@ export class Game {
       boss: this.boss ? { hp: this.boss.hp, phase: this.boss.phase } : null,
       pos: this.player.pos.toArray().map((v) => Math.round(v * 10) / 10),
       mayaOpen: this.mayaWalls.filter((w) => w.box.off).length,
+      fires: this.fires.length,
+      yaw: this.camYaw,
     }),
     hurtBoss: (amount: number): void => this.boss?.hit(amount, false),
     autopilot: (): void => void (this.vimana.autopilot = true),
     /** Runs the game logic for a number of seconds without waiting for frames (used by tests). */
     simulate: (seconds: number): void => {
-      for (let t = 0; t < seconds; t += 1 / 30) this.update(1 / 30, t);
+      // Runs the same per-frame input handling as the real loop, so tests can drive the game with real key and mouse events.
+      for (let t = 0; t < seconds; t += 1 / 30) {
+        this.input.poll();
+        this.update(1 / 30, t);
+        this.input.endFrame();
+      }
     },
   };
 }

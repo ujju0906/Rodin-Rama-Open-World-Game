@@ -221,7 +221,8 @@ async function boot(): Promise<void> {
       .copy(s.fogColor)
       .lerp(swampFog.clone().multiplyScalar(0.25 + 0.75 * (1 - s.night)), swamp * 0.7);
     fog.color.multiplyScalar(1 - dark * 0.93);
-    fog.density = s.fogDensity * (1 + rain * 0.9 + swamp * 1.3 + dark * 3.5);
+    fog.density =
+      s.fogDensity * (1 + rain * 0.9 + swamp * 1.3 + dark * 3.5) * (1 - 0.75 * game.fogClear);
 
     const sunUp = THREE.MathUtils.smoothstep(s.sunDir.y, -0.06, 0.08);
     sunDisc.position.copy(camera.position).addScaledVector(s.sunDir, 2600);

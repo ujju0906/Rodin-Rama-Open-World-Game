@@ -249,7 +249,17 @@ function prepare(
     }
     // Cloth that hangs in front of or behind the torso must not follow the arms, or it fans out when the bow is raised.
     const low = y < hipY;
+    // Only strip arm weights from cloth: a vertex that sits on the arm itself (almost all arm weight) keeps them,
+    // otherwise the inner half of the upper arm stays behind and the sleeve tears into a wing.
+    let armW = 0;
+    let allW = 0;
+    for (const [b, w] of acc) {
+      allW += w;
+      if (armBones.includes(b)) armW += w;
+    }
+    const onArm = !low && armW > allW * 0.6;
     if (
+      !onArm &&
       Math.abs(x - ox) < (low ? (spec.hipHalfWidth ?? spec.torsoHalfWidth) : spec.torsoHalfWidth)
     ) {
       let moved = 0;

@@ -445,7 +445,7 @@ export class Forest {
       for (let j = -1; j <= 1; j++) {
         const list = this.trunks.get((cx + i) * 4096 + cz + j);
         if (!list) continue;
-        for (const t of list) if (Math.hypot(x - t.x, z - t.z) < t.r + pad) return true;
+        for (const t of list) if (Math.hypot(x - t.x, z - t.z) < t.r * 2.3 + pad) return true; // trunks flare at the base
       }
     }
     return false;

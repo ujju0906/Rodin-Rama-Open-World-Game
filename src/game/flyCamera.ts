@@ -38,7 +38,11 @@ export class FlyCamera {
       this.idle = false;
       this.lastX = e.clientX;
       this.lastY = e.clientY;
-      canvas.setPointerCapture(e.pointerId);
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch {
+        /* capture is refused while the pointer is locked; dragging still works */
+      }
     });
     canvas.addEventListener('pointermove', (e) => {
       if (!this.dragging) return;

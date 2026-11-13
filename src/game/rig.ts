@@ -147,27 +147,19 @@ export class Rig {
       const bowDir = fwd.clone().addScaledVector(right, -0.22);
       this.point('LeftArm', 'LeftForeArm', bowDir, aim);
       this.point('LeftForeArm', 'LeftHand', bowDir, aim);
-      // String arm: elbow out and back, hand drawn to the cheek.
-      this.point(
-        'RightArm',
-        'RightForeArm',
-        fwd
-          .clone()
-          .multiplyScalar(0.35 - draw * 0.8)
-          .addScaledVector(right, 0.85)
-          .addScaledVector(up, 0.12),
-        aim,
-      );
-      this.point(
-        'RightForeArm',
-        'RightHand',
-        fwd
-          .clone()
-          .multiplyScalar(1 - draw * 0.5)
-          .addScaledVector(right, -0.9)
-          .addScaledVector(up, 0.1),
-        aim,
-      );
+      // String arm: elbow kept low and out (a high elbow tears the automatic skinning), hand drawn towards the cheek.
+      const elbow = fwd
+        .clone()
+        .multiplyScalar(0.25 - draw * 0.55)
+        .addScaledVector(right, 0.7)
+        .addScaledVector(up, -0.5);
+      const hand = fwd
+        .clone()
+        .multiplyScalar(0.9 - draw * 0.6)
+        .addScaledVector(right, -0.45)
+        .addScaledVector(up, 0.55);
+      this.point('RightArm', 'RightForeArm', elbow, aim);
+      this.point('RightForeArm', 'RightHand', hand, aim);
     }
     if (attack > 0) {
       const swing = fwd
