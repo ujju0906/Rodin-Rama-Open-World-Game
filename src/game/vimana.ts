@@ -3,7 +3,9 @@ import type { GameAudio } from '../core/audio';
 import type { Input } from '../core/input';
 import { POI } from '../data/world';
 import type { Arrows, Hittable } from './combat';
+import vimanaMesh from '../assets/vimanaMesh';
 import { createRakshasa } from './models';
+import { staticMesh } from './skinnedBody';
 import type { Particles } from './particles';
 
 /** Flight numbers (see DESIGN.md). */
@@ -52,6 +54,17 @@ const cloth = new THREE.MeshStandardMaterial({
 /** Procedural vimana: a carved hull, a stepped temple tower, lotus-petal wings and teal crystals. */
 function buildModel(): { root: THREE.Group; wings: THREE.Group[]; crystals: THREE.Mesh[] } {
   const root = new THREE.Group();
+  {
+    // The Rodin (Hyper3D) vimana, scaled to about 13 m long and sitting on its keel.
+    const craft = staticMesh(vimanaMesh, 0.38, 0.6);
+    craft.scale.setScalar(6.6);
+    craft.position.y = -2.2;
+    root.add(craft);
+    const glow = new THREE.PointLight(0x40e0d0, 40, 30, 1.6);
+    glow.position.set(0, -1.5, 0);
+    root.add(glow);
+    if (vimanaMesh.length > 0) return { root, wings: [], crystals: [] };
+  }
   const add = (
     geo: THREE.BufferGeometry,
     mat: THREE.Material,

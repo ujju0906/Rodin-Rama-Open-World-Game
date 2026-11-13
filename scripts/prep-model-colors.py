@@ -1,6 +1,7 @@
 # Prepares a Rodin (Hyper3D) OBJ whose texture is split into very small islands:
 # the diffuse texture is baked into vertex colours, then the mesh is reduced by spatial clustering.
-# Usage: python3 scripts/prep-model-colors.py <obj> <diffuse image> <out.ts> <cell size in metres>
+# Usage: python3 scripts/prep-model-colors.py <obj> <diffuse image> <out.ts> <cell size> [cut expression in x,y,z]
+# The optional cut expression removes faces whose vertices all satisfy it (for example a weapon fused to a hand).
 import numpy as np, base64, struct, sys
 from PIL import Image
 OBJ, TEX, OUT, CELL = sys.argv[1], sys.argv[2], sys.argv[3], float(sys.argv[4])
@@ -20,13 +21,19 @@ uv=VT[ft]
 px=np.clip((uv[:,0]*W).astype(int),0,W-1); py=np.clip(((1-uv[:,1])*H).astype(int),0,H-1)
 col=img[py,px]**2.2   # to linear
 P=V[fv]; y=P[:,1]
+FACES=None
+if len(sys.argv)>5:
+    x,z=P[:,0],P[:,2]
+    FACES=~eval(sys.argv[5]).reshape(-1,3).all(1)
 cs=np.where(y>y.max()*0.8,CELL*0.5,CELL)
 c=np.floor(P/cs[:,None]).astype(np.int64)
 pk=((c[:,0]+2000)*4000+(c[:,1]+2000))*4000+(c[:,2]+2000)+(y>y.max()*0.8).astype(np.int64)*10**12
 u,ci=np.unique(pk,return_inverse=True); n=len(u); cnt=np.bincount(ci,minlength=n)[:,None]
 NP=np.stack([np.bincount(ci,P[:,k],n) for k in range(3)],1)/cnt
 NC=np.stack([np.bincount(ci,col[:,k],n) for k in range(3)],1)/cnt
-NF=ci.reshape(-1,3); ok=(NF[:,0]!=NF[:,1])&(NF[:,1]!=NF[:,2])&(NF[:,0]!=NF[:,2]); NF=np.unique(NF[ok],axis=0)
+NF=ci.reshape(-1,3)
+if FACES is not None: NF=NF[FACES]
+ok=(NF[:,0]!=NF[:,1])&(NF[:,1]!=NF[:,2])&(NF[:,0]!=NF[:,2]); NF=np.unique(NF[ok],axis=0)
 fn=np.cross(NP[NF[:,1]]-NP[NF[:,0]],NP[NF[:,2]]-NP[NF[:,0]]); N=np.zeros((n,3))
 for k in range(3): np.add.at(N,NF[:,k],fn)
 N/=np.linalg.norm(N,axis=1,keepdims=True)+1e-12

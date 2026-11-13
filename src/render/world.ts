@@ -73,7 +73,7 @@ export class World {
     this.water.update(elapsed, s, sky.material.uniforms, this.weather.rain);
     for (const f of this.structures.flames) {
       const flicker = 0.85 + 0.15 * Math.sin(elapsed * 17 + f.base) * Math.sin(elapsed * 7.3 + 1.2);
-      f.light.intensity = f.base * (0.4 + 0.6 * s.night) * flicker;
+      f.light.intensity = f.base * (0.12 + 0.88 * s.night) * flicker;
       f.mesh.scale.y = 1.7 + 0.35 * flicker;
     }
   }

@@ -179,8 +179,14 @@ export class Player {
     const hand = rig.worldPos('LeftHand', new THREE.Vector3());
     f.root.worldToLocal(hand);
     f.bow.position.copy(hand);
-    f.bow.rotation.set(0, -Math.PI / 2, THREE.MathUtils.lerp(1.15, 0, this.aimBlend), 'YXZ');
-    f.bow.rotation.x = THREE.MathUtils.lerp(0, -this.aimPitch, this.aimBlend);
+    // Raised and facing the aim while shooting; otherwise carried upright at his side.
+    f.bow.rotation.set(
+      THREE.MathUtils.lerp(0, -this.aimPitch, this.aimBlend),
+      -Math.PI / 2,
+      THREE.MathUtils.lerp(0.12, 0, this.aimBlend),
+      'YXZ',
+    );
+    f.bow.position.y += THREE.MathUtils.lerp(0.18, 0, this.aimBlend);
     f.bow.visible = !rolling;
     f.nocked.visible = this.drawing;
     f.nocked.position.x = -0.1 - this.draw * 0.26;

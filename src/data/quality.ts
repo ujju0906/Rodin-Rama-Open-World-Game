@@ -35,7 +35,7 @@ export const QUALITY: Record<QualityName, QualityPreset> = {
   },
   medium: {
     label: 'Medium',
-    maxPixelRatio: 1.25,
+    maxPixelRatio: 1.5,
     shadows: true,
     shadowMapSize: 2048,
     bloom: true,

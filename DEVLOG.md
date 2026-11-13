@@ -48,6 +48,8 @@
 - **Tataka model (2026-11-12).** Tataka's body is now the Rodin (Hyper3D) model. Its texture is cut into very small islands, so `scripts/prep-model-colors.py` bakes the diffuse texture into vertex colours and reduces the mesh to about 186,000 triangles (`src/assets/tatakaMesh.ts`). The skinning code is now generic (`src/game/skinnedBody.ts`): each body has a small spec describing how the statue stands (arms, legs, skull height). `scripts/prep-model.py` is the textured variant used for Rama.
 - Rakshasa: only its textures and one FBX arrived (the OBJ was missing), so the grunts, archers and Maricha still use the mannequin body. Tataka's textures are kept in `ArtRef/tataka_textures`.
 
+- **Rakshasa, deer, vimana and clean-up (2026-11-12).** The Rodin rakshasa (grunts, archers, Maricha), golden deer and vimana are in, all through `scripts/prep-model-colors.py` (texture baked into vertex colours). The rakshasa's fused weapon is cut off with the script's cut expression. Fixes: Rama carries the bow upright at his side when not aiming; the camera no longer passes through tree trunks or shrine pillars; shrines are solid; daytime lamp glare reduced; sashes below the hips no longer stretch with the arms.
+
 ## Next
 - Real character models: Higgsfield image-to-3D with rigging needs credits (balance is 0.5).
 - Ledge climbing, skill trees, cutscene cameras, depth of field.
@@ -57,9 +59,9 @@
 ## Known issues
 - Frame rate is unverified on real hardware: headless Chrome here uses software rendering (about 0.3 fps on Low). Press F in the game to see the meter; change quality in the pause menu.
 - Rama deforms by automatic skinning, so cloth can stretch at the left shoulder when the bow is raised and a short stub of the original bow remains in his left hand.
-- The rakshasas and Maricha still share one mannequin-style body with a smooth, featureless face.
+- The golden deer is a rigid model (no leg animation). The flying rakshasas in the vimana section are still simple figures.
+- The rakshasa keeps a short remnant of his original weapon in the right hand.
 - Tataka uses vertex colours, not her normal, roughness or metallic maps, so fine surface detail is softer than Rama's. They are animated and dressed, but not the painterly look in the concept art; that still needs bespoke models.
-- The golden deer and the flying rakshasas in the vimana section are still simple shapes.
 - Enemies walk in straight lines and can get stuck on temple walls or trees.
 - The golden deer chase needs only one Divya Drishti pulse at the end of its route; earlier pulses just make it flicker.
 - Tataka has 720 health, not the 1200 in the design draft (tuned in `src/data/gameplay.ts`).

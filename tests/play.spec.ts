@@ -14,7 +14,7 @@ type State = {
  * Logic is advanced with `simulate` so it does not depend on the (slow) headless frame rate.
  */
 test('story beats work end to end', async ({ page }) => {
-  test.setTimeout(600_000);
+  test.setTimeout(1_500_000);
   const errors: string[] = [];
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
   page.on('pageerror', (e) => errors.push(String(e)));

@@ -437,6 +437,20 @@ export class Forest {
     this.group.add(deadMesh);
   }
 
+  /** True if the point is inside a tree trunk (used to keep the camera out of trees). */
+  insideTrunk(x: number, z: number, pad = 0.35): boolean {
+    const cx = Math.floor(x / 10);
+    const cz = Math.floor(z / 10);
+    for (let i = -1; i <= 1; i++) {
+      for (let j = -1; j <= 1; j++) {
+        const list = this.trunks.get((cx + i) * 4096 + cz + j);
+        if (!list) continue;
+        for (const t of list) if (Math.hypot(x - t.x, z - t.z) < t.r + pad) return true;
+      }
+    }
+    return false;
+  }
+
   /** Pushes a circle out of any tree trunk it overlaps. */
   pushOut(p: THREE.Vector3, r: number): void {
     const cx = Math.floor(p.x / 10);

@@ -1,7 +1,9 @@
 import * as THREE from 'three';
+import deerMesh from '../assets/deerMesh';
+import rakshasaMesh from '../assets/rakshasaMesh';
 import tatakaMesh from '../assets/tatakaMesh';
 import ramaMesh from '../assets/ramaMesh';
-import { attachBody, type BodySpec } from './skinnedBody';
+import { attachBody, staticMesh, type BodySpec } from './skinnedBody';
 import { Rig, rigReady } from './rig';
 
 /**
@@ -304,6 +306,15 @@ export function createDeer(): {
   legs: THREE.Group[];
 } {
   const root = new THREE.Group();
+  {
+    // The Rodin (Hyper3D) golden deer: a rigid model, so it bounds along without leg animation.
+    const deer = staticMesh(deerMesh, 0.3, 0.75);
+    deer.scale.setScalar(0.85);
+    const mat = deer.material as THREE.MeshStandardMaterial;
+    mat.emissive.setRGB(0.22, 0.13, 0.03);
+    root.add(deer);
+    if (deerMesh.length > 0) return { root, material: mat, legs: [] };
+  }
   const material = new THREE.MeshStandardMaterial({
     color: 0xf2b53a,
     metalness: 1,
@@ -374,6 +385,18 @@ const RAMA_BODY: BodySpec = {
   },
   torsoHalfWidth: 0.17,
 };
+const RAKSHASA_BODY: BodySpec = {
+  key: 'rakshasa',
+  data: rakshasaMesh,
+  skullTop: 1.82,
+  arms: {
+    right: [V3(-0.3, -0.95, 0.02), V3(-0.3, -0.95, 0.1)],
+    left: [V3(0.3, -0.95, 0.02), V3(0.3, -0.95, 0.1)],
+  },
+  legs: { right: V3(-0.21, -0.98, 0), left: V3(0.21, -0.98, 0) },
+  torsoHalfWidth: 0.2,
+  hipHalfWidth: 0.34,
+};
 const TATAKA_BODY: BodySpec = {
   key: 'tataka',
   data: tatakaMesh,
@@ -439,57 +462,12 @@ function createRiggedRama(): RamaFigure {
 }
 
 function createRiggedRakshasa(kind: 'grunt' | 'archer' | 'maricha'): Figure {
-  const f = rigged(
-    kind === 'maricha' ? 0x4a2c14 : 0x1f171c,
-    kind === 'maricha' ? 0xc99a2e : 0x6e1512,
-  );
+  const f = rigged(0x1f171c, 0x6e1512);
   const rig = f.rig;
-  const bone = std(0xc9bfa5, 0.6);
-  const eye = new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 0.5, 0.1), fog: false });
-  const head = new THREE.Group();
-  for (const s of [-1, 1]) {
-    const horn = mesh(new THREE.ConeGeometry(0.04, 0.3, 8), bone, s * 0.09, 0.22, 0.02, head);
-    horn.rotation.z = -s * 0.55;
-    mesh(new THREE.SphereGeometry(0.02, 6, 6), eye, s * 0.04, 0.085, 0.1, head);
-    mesh(new THREE.ConeGeometry(0.016, 0.07, 5), bone, s * 0.035, 0.0, 0.105, head).rotation.x =
-      Math.PI;
-  }
-  mesh(
-    new THREE.SphereGeometry(0.112, 12, 10, 0, Math.PI * 2, 0, 1.0),
-    std(0x0d0a0b, 0.9),
-    0,
-    0.105,
-    -0.01,
-    head,
-  );
-  rig.attach('Head', head);
-  const cloth = new THREE.MeshStandardMaterial({
-    color: kind === 'maricha' ? 0x8a6a1e : 0x5a1616,
-    roughness: 0.9,
-    side: THREE.DoubleSide,
-  });
-  const hips = new THREE.Group();
-  mesh(new THREE.CylinderGeometry(0.2, 0.3, 0.42, 14, 1, true), cloth, 0, -0.16, 0, hips);
-  mesh(
-    new THREE.TorusGeometry(0.2, 0.03, 6, 16),
-    std(0x3a2a1a, 0.5, 0.8),
-    0,
-    0.06,
-    0,
-    hips,
-  ).rotation.x = Math.PI / 2;
-  rig.attach('Hips', hips);
-  const chest = new THREE.Group();
-  for (const s of [-1, 1])
-    mesh(
-      new THREE.SphereGeometry(0.11, 10, 8, 0, Math.PI * 2, 0, 1.6),
-      std(0x3a2a1a, 0.45, 0.9),
-      s * 0.2,
-      0.12,
-      0,
-      chest,
-    );
-  rig.attach('Spine2', chest);
+  // The body is the Rodin (Hyper3D) rakshasa model with its texture baked into vertex colours.
+  const body = attachBody(rig, RAKSHASA_BODY);
+  if (kind === 'maricha') body.color.setRGB(1.3, 1.05, 0.6); // Maricha keeps a trace of the golden deer
+  f.skins.push(body);
   if (kind === 'archer') {
     const arc = mesh(
       new THREE.TorusGeometry(0.55, 0.02, 5, 18, Math.PI * 0.86),

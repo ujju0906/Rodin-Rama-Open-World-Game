@@ -114,6 +114,7 @@ function shrine(
   x: number,
   y: number,
   z: number,
+  circles: { x: number; z: number; r: number }[],
 ): void {
   stone.box(x, y + 0.2, z, 7, 0.6, 7, 0.75);
   stone.box(x, y + 0.65, z, 5.8, 0.4, 5.8, 0.95);
@@ -126,6 +127,7 @@ function shrine(
   ] as const) {
     const px = x + sx * 1.8;
     const pz = z + sz * 1.8;
+    circles.push({ x: px, z: pz, r: 0.45 });
     stone.box(px, y + 1.32, pz, 0.8, 0.28, 0.8, 0.8);
     stone.cyl(px, y + 2.9, pz, 0.27, 3, 1);
     bronze.cyl(px, y + 2.1, pz, 0.33, 0.16);
@@ -143,6 +145,7 @@ function shrine(
   bronze.cyl(x, ry + 0.3, z, 0.36, 0.5);
   bronze.cyl(x, y + 1.65, z, 0.2, 1.0);
   bronze.cyl(x, y + 2.25, z, 0.5, 0.2);
+  circles.push({ x, z, r: 0.6 });
   addFlame(group, flames, x, y + 2.6, z, 1, 55);
 }
 
@@ -184,7 +187,7 @@ export function buildStructures(hf: Heightfield, tex: GameTextures): Structures 
 
   // --- Shrines -------------------------------------------------------------
   for (const p of [POI.firstShrine, POI.riverShrine])
-    shrine(stone, bronze, group, flames, p.x, hf.heightAt(p.x, p.z) - 0.15, p.z);
+    shrine(stone, bronze, group, flames, p.x, hf.heightAt(p.x, p.z) - 0.15, p.z, circles);
 
   // --- Hermitage -----------------------------------------------------------
   {

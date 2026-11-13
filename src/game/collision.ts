@@ -78,6 +78,10 @@ export class Colliders {
 
   /** True if a camera at this point would be inside a wall. */
   blocksView(p: THREE.Vector3): boolean {
+    if (this.world.forest.insideTrunk(p.x, p.z)) return true;
+    for (const c of this.circles)
+      if (Math.hypot(p.x - c.x, p.z - c.z) < c.r + 0.3 && p.y < this.groundAt(c.x, c.z) + 7)
+        return true;
     if (Math.abs(p.x - POI.temple.x) > 38 || Math.abs(p.z - POI.temple.z) > 38) return false;
     for (const b of this.boxes) {
       if (b.off) continue;

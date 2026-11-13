@@ -16,6 +16,8 @@ export interface BodySpec {
   legs?: { right: THREE.Vector3; left: THREE.Vector3 };
   /** Cloth closer to the centre line than this never follows the arms. */
   torsoHalfWidth: number;
+  /** The same limit below hip height, where sashes hang beside the hands. */
+  hipHalfWidth?: number;
 }
 
 const cache = new Map<
@@ -66,6 +68,16 @@ function decode(meshData: string, colors: boolean): THREE.BufferGeometry {
   g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
   g.setIndex(new THREE.BufferAttribute(index.slice(), 1));
   return g;
+}
+
+/** A rigid (unskinned) Rodin model with baked vertex colours, for props and creatures. */
+export function staticMesh(data: string, roughness: number, metalness: number): THREE.Mesh {
+  const mesh = new THREE.Mesh(
+    decode(data, true),
+    new THREE.MeshStandardMaterial({ vertexColors: true, roughness, metalness }),
+  );
+  mesh.castShadow = true;
+  return mesh;
 }
 
 function material(tex: string): THREE.MeshStandardMaterial {
@@ -206,6 +218,7 @@ function prepare(
     .map((b, i) => (/(Arm|ForeArm|Hand)/.test(b.name) ? i : -1))
     .filter((i) => i >= 0);
   const chest = bones.findIndex((b) => b.name.endsWith('Spine2'));
+  const hipY = rig.worldPos('Hips', new THREE.Vector3()).y;
   const skinIndex = new Uint16Array(pos.count * 4);
   const skinWeight = new Float32Array(pos.count * 4);
   const acc = new Map<number, number>();
@@ -235,13 +248,17 @@ function prepare(
       r.idx.forEach((b, n) => acc.set(b, (acc.get(b) ?? 0) + r.w[n]! * k));
     }
     // Cloth that hangs in front of or behind the torso must not follow the arms, or it fans out when the bow is raised.
-    if (Math.abs(x - ox) < spec.torsoHalfWidth) {
+    const low = y < hipY;
+    if (
+      Math.abs(x - ox) < (low ? (spec.hipHalfWidth ?? spec.torsoHalfWidth) : spec.torsoHalfWidth)
+    ) {
       let moved = 0;
       for (const b of armBones) {
         moved += acc.get(b) ?? 0;
         acc.delete(b);
       }
-      if (moved > 0) acc.set(chest, (acc.get(chest) ?? 0) + moved);
+      const anchor = low ? 0 : chest;
+      if (moved > 0) acc.set(anchor, (acc.get(anchor) ?? 0) + moved);
     }
     const top = [...acc.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
     const sum = top.reduce((s, e) => s + e[1], 0) || 1;

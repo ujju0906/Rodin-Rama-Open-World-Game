@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createDeer, createRakshasa, createTataka } from './game/models';
 import { Player } from './game/player';
 import { loadRig } from './game/rig';
+import { Vimana } from './game/vimana';
 
 /** Developer page: the characters side by side under plain light, for checking models and poses. */
 async function main(): Promise<void> {
@@ -27,8 +28,8 @@ async function main(): Promise<void> {
     camera.position.set(-2.9, 1.5, 6.2);
     camera.lookAt(-2.9, 1.05, 0);
   } else {
-    camera.position.set(3.4, 2.4, 6.5);
-    camera.lookAt(3.4, 2.0, -1.5);
+    camera.position.set(1.3, 1.3, 4.6);
+    camera.lookAt(1.3, 1.0, 0);
   }
 
   await loadRig();
@@ -61,9 +62,11 @@ async function main(): Promise<void> {
   tataka.root.rotation.y = -0.35;
   tataka.root.scale.setScalar(2.2);
   const deer = createDeer();
-  deer.root.position.set(-0.4, 0, -2.5);
+  deer.root.position.set(-0.6, 0, 1.2);
   deer.root.rotation.y = 1.9;
-  scene.add(grunt.root, archer.root, tataka.root, deer.root);
+  const vimana = new Vimana();
+  vimana.park(9.5, 1.2, -6);
+  scene.add(grunt.root, archer.root, tataka.root, deer.root, vimana.group);
 
   let t = 0;
   const frame = (): void => {
