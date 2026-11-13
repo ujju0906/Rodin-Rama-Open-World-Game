@@ -86,7 +86,7 @@ export class Player {
     const moving = Math.hypot(mx, mz) > 0.05;
     this.swimming = col.inWater(this.pos.x, this.pos.z) && this.pos.y <= WORLD.waterLevel - 0.5;
 
-    if (canAct && !this.dead && input.hit('control') && this.dodgeCd <= 0 && !this.swimming) {
+    if (canAct && !this.dead && input.hit('c') && this.dodgeCd <= 0 && !this.swimming) {
       this.dodgeT = PLAYER.dodgeTime;
       this.dodgeCd = PLAYER.dodgeCooldown;
       this.invulnerable = Math.max(this.invulnerable, PLAYER.dodgeInvulnerable);

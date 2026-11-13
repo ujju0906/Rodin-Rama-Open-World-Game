@@ -23,7 +23,7 @@ The site uses relative paths, so it also works from a sub-folder (for example `u
 
 ## Controls
 
-W A S D move, mouse look, Shift sprint, Ctrl dodge, Space jump. Hold and release the left mouse button to shoot (right button aims). Hold Q to chant an astra; hold Tab for the astra wheel (or press 1 / 2). E is Divya Drishti. Esc pauses. P is photo mode. F shows the frame rate. Gamepads work too.
+W A S D move, mouse look, Shift sprint, C dodge, Space jump. Hold and release the left mouse button to shoot (right button aims). Hold Q to chant an astra; hold Tab for the astra wheel (or press 1 / 2). E is Divya Drishti. Esc pauses. P is photo mode. F shows the frame rate. Gamepads work too.
 
 ## Where things are
 

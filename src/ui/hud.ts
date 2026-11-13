@@ -207,7 +207,7 @@ export class Hud {
   ): void {
     const controls = `<table>
       <tr><td>Move / look</td><td>W A S D / mouse</td></tr>
-      <tr><td>Sprint · dodge · jump</td><td>Shift · Ctrl · Space</td></tr>
+      <tr><td>Sprint · dodge · jump</td><td>Shift · C · Space</td></tr>
       <tr><td>Draw and release the bow</td><td>hold and release left mouse (right mouse: aim)</td></tr>
       <tr><td>Chant an astra</td><td>hold Q, release when the rings are full (hold Tab for the astra wheel, or 1 / 2)</td></tr>
       <tr><td>Divya Drishti</td><td>E</td></tr>

@@ -164,7 +164,7 @@ XP from enemies, shrines and discoveries. One skill point per level, max level 2
 | Action | Keyboard + mouse | Gamepad |
 |--------|------------------|---------|
 | Move / look | WASD / mouse | Left stick / right stick |
-| Sprint / dodge / jump | Shift / Ctrl / Space | L3 / B / A |
+| Sprint / dodge / jump | Shift / C / Space | L3 / B / A |
 | Aim / draw and release | Right mouse / left mouse | LT / RT |
 | Chant astra | Hold Q | Hold RB |
 | Astra wheel | Hold Tab | Hold LB |

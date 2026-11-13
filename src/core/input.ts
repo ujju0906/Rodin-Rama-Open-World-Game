@@ -81,7 +81,7 @@ export class Input {
         if (this.padHit(i)) this.pressed.add(key);
       };
       set(0, ' ');
-      set(1, 'control');
+      set(1, 'c');
       set(3, 'e');
       set(2, 'f');
       set(5, 'q');

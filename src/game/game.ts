@@ -750,8 +750,8 @@ export class Game {
 
     // --- bow
     const canAct = !p.dead;
-    p.aiming = input.aim && canAct;
     const chanting = this.chantT > 0;
+    p.aiming = (input.aim || chanting) && canAct; // Rama turns to face the aim while chanting
     if (canAct && input.fire && !chanting && !p.dodging) {
       if (!p.drawing) {
         p.drawing = true;
@@ -803,8 +803,19 @@ export class Game {
       else this.hud.toast('Chant released too early');
       this.chantT = 0;
     }
-    if (canAct && input.hit('e') && this.drishtiKnown && this.cooldown.drishti! <= 0)
-      this.castDrishti();
+    // Tell the player why nothing happened, instead of staying silent.
+    if (canAct && input.hit('q')) {
+      if (!this.known.has(this.selected))
+        this.hud.toast('No astra learned yet: find the forest shrine');
+      else if (this.cooldown[this.selected]! > 0)
+        this.hud.toast(`${def.name} returns in ${Math.ceil(this.cooldown[this.selected]!)} s`);
+    }
+    if (canAct && input.hit('e')) {
+      if (!this.drishtiKnown) this.hud.toast('Divya Drishti is learned at the river shrine');
+      else if (this.cooldown.drishti! > 0)
+        this.hud.toast(`Divya Drishti returns in ${Math.ceil(this.cooldown.drishti!)} s`);
+      else this.castDrishti();
+    }
 
     // --- player and enemies
     p.aimPitch = this.camPitch;

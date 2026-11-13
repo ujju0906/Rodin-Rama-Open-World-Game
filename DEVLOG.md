@@ -70,4 +70,4 @@
 - The vimana cannot be failed: if the hull reaches zero the craft finishes the route on its own.
 
 ## Controls
-W A S D move, mouse look, Shift sprint, Ctrl dodge, Space jump. Hold and release left mouse to shoot (right mouse aims). Hold Q to chant an astra (1 / 2 or Tab to choose). E for Divya Drishti. Esc pauses. P photo mode. F stats. Gamepad is supported.
+W A S D move, mouse look, Shift sprint, C dodge, Space jump. Hold and release left mouse to shoot (right mouse aims). Hold Q to chant an astra (1 / 2 or Tab to choose). E for Divya Drishti. Esc pauses. P photo mode. F stats. Gamepad is supported.
