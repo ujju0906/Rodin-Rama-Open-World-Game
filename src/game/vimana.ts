@@ -193,6 +193,8 @@ export class Vimana {
   storm = 0;
   lightning = 0;
   autopilot = false;
+  /** Free flight after the story: no gates, no storm, no foes. */
+  free = false;
   private boost = 1;
   private fireT = 0;
   private roll = 0;
@@ -201,9 +203,22 @@ export class Vimana {
   private foes: SkyFoe[] = [];
   private bolt = new THREE.PointLight(0xaab8ff, 0, 600, 1.2);
   private clock = 0;
+  /** A tall pillar of light over the parked craft, so it can be found from anywhere in the forest. */
+  private beacon: THREE.Mesh;
 
   constructor() {
-    this.group.add(this.model.root, this.bolt);
+    const beaconMat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(0.4, 2.4, 2.2),
+      transparent: true,
+      opacity: 0.55,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      fog: false,
+      side: THREE.DoubleSide,
+    });
+    this.beacon = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 3.2, 260, 16, 1, true), beaconMat);
+    this.beacon.visible = false;
+    this.group.add(this.model.root, this.bolt, this.beacon);
     this.group.visible = false;
     const ringMat = new THREE.MeshBasicMaterial({
       color: new THREE.Color(3, 2, 0.6),
@@ -225,6 +240,12 @@ export class Vimana {
     return ROUTE.length;
   }
 
+  /** The gate to fly through next, or null when there is none. */
+  get nextGate(): THREE.Vector3 | null {
+    if (!this.active || this.free || this.gate >= ROUTE.length) return null;
+    return this.gates[this.gate]!.position;
+  }
+
   get targets(): Hittable[] {
     return this.foes;
   }
@@ -236,26 +257,33 @@ export class Vimana {
     this.model.root.rotation.set(0, 0.6, 0);
     this.group.visible = true;
     this.parked = true;
+    this.beacon.position.set(this.pos.x, this.pos.y + 130, this.pos.z);
+    this.beacon.visible = true;
   }
 
   hide(scene: THREE.Scene): void {
     this.group.visible = false;
-    this.parked = this.active = false;
+    this.parked = this.active = this.free = this.autopilot = false;
+    this.beacon.visible = false;
     for (const g of this.gates) scene.remove(g);
     for (const f of this.foes) scene.remove(f.root);
     this.foes = [];
   }
 
-  takeOff(scene: THREE.Scene): void {
+  /** Lifts off. With `free` set, it flies anywhere with no gates, storm or foes. */
+  takeOff(scene: THREE.Scene, free = false, yaw?: number): void {
     this.parked = false;
     this.active = true;
+    this.free = free;
+    this.beacon.visible = false;
     this.hull = VIMANA.hull;
-    this.gate = 0;
+    this.gate = free ? ROUTE.length : 0;
     this.speed = 12;
     this.pos.y += 3;
     const first = ROUTE[0]!;
-    this.yaw = Math.atan2(first[0] - this.pos.x, first[2] - this.pos.z);
+    this.yaw = yaw ?? Math.atan2(first[0] - this.pos.x, first[2] - this.pos.z);
     this.pitch = 0.35;
+    if (free) return;
     for (const g of this.gates) {
       g.visible = true;
       scene.add(g);
@@ -315,6 +343,9 @@ export class Vimana {
     const m = this.model;
     m.crystals.forEach((c, i) => c.scale.setScalar(1 + 0.18 * Math.sin(this.clock * 4 + i)));
     if (!this.active) {
+      if (this.beacon.visible)
+        (this.beacon.material as THREE.MeshBasicMaterial).opacity =
+          0.4 + 0.18 * Math.sin(this.clock * 2.4);
       m.root.position.y = this.pos.y + Math.sin(this.clock * 1.3) * 0.25;
       return false;
     }

@@ -1,7 +1,10 @@
 import './hud.css';
 import { QUALITY_ORDER, type QualityName } from '../data/quality';
+import { PATHS, POI, WORLD, riverZ } from '../data/world';
 
 export interface HudState {
+  /** Minimap: where Rama (or the vimana) is, the objective and the parked vimana, in world metres. */
+  map: { x: number; z: number; marker: [number, number] | null; vimana: [number, number] | null };
   health: number;
   focus: number;
   objective: string;
@@ -26,6 +29,8 @@ export class Hud {
   private cardEl: HTMLDivElement;
   private storyTimer = 0;
   private toastTimer = 0;
+  private mapBase: HTMLCanvasElement | null = null;
+  private mapBig = false;
 
   constructor() {
     this.root = document.createElement('div');
@@ -34,6 +39,7 @@ export class Hud {
       <div class="vig"></div><div class="gold"></div>
       <div class="compass"></div>
       <div class="objective"></div>
+      <div class="minimap"><canvas width="360" height="360"></canvas><small>M: map</small></div>
       <div class="toast"></div>
       <div class="cross"><i class="d"></i><i class="l"></i><i class="r"></i><i class="t"></i><i class="b"></i></div>
       <div class="boss"><span>Tataka</span><div class="bar"><i></i></div></div>
@@ -48,6 +54,127 @@ export class Hud {
     this.cardEl.innerHTML =
       '<div class="art"></div><div class="shade"></div><div class="text"><h2></h2><p></p><small>Click to continue</small></div>';
     document.body.append(this.root, this.overlay, this.cardEl);
+    window.addEventListener('keydown', (e) => {
+      if (e.key.toLowerCase() !== 'm') return;
+      this.mapBig = !this.mapBig;
+      el('#hud .minimap').classList.toggle('big', this.mapBig);
+    });
+  }
+
+  /** Draws the fixed part of the map once: forest, river, paths and places. */
+  private buildMapBase(size: number): HTMLCanvasElement {
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const g = c.getContext('2d')!;
+    const half = WORLD.size / 2;
+    const px = (v: number): number => ((v + half) / WORLD.size) * size;
+    g.fillStyle = 'rgba(22, 40, 26, 0.82)';
+    g.fillRect(0, 0, size, size);
+    // River.
+    g.strokeStyle = 'rgba(90, 170, 200, 0.9)';
+    g.lineWidth = size / 70;
+    g.beginPath();
+    for (let x = -half; x <= half; x += 10) {
+      if (x === -half) g.moveTo(px(x), px(riverZ(x)));
+      else g.lineTo(px(x), px(riverZ(x)));
+    }
+    g.stroke();
+    // Swamp.
+    g.fillStyle = 'rgba(90, 110, 60, 0.75)';
+    g.beginPath();
+    g.arc(px(POI.swamp.x), px(POI.swamp.z), (POI.swamp.r / WORLD.size) * size, 0, Math.PI * 2);
+    g.fill();
+    // Footpaths.
+    g.strokeStyle = 'rgba(190, 150, 100, 0.7)';
+    g.lineWidth = size / 160;
+    for (const path of PATHS) {
+      g.beginPath();
+      path.forEach(([x, z], i) => (i ? g.lineTo(px(x), px(z)) : g.moveTo(px(x), px(z))));
+      g.stroke();
+    }
+    // Places.
+    g.font = `${Math.round(size / 26)}px Georgia, serif`;
+    g.textAlign = 'center';
+    const places: [string, { x: number; z: number }][] = [
+      ['Hermitage', POI.hermitage],
+      ['Shrine', POI.firstShrine],
+      ['River shrine', POI.riverShrine],
+      ['Temple', POI.temple],
+      ['Swamp', POI.swamp],
+    ];
+    for (const [name, p] of places) {
+      g.fillStyle = 'rgba(244, 230, 200, 0.9)';
+      g.beginPath();
+      g.arc(px(p.x), px(p.z), size / 90, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = 'rgba(244, 230, 200, 0.75)';
+      g.fillText(name, px(p.x), px(p.z) - size / 45);
+    }
+    g.fillStyle = 'rgba(244, 230, 200, 0.8)';
+    g.fillText('N', size / 2, size / 18);
+    return c;
+  }
+
+  /** North-up minimap with Rama's arrow, the objective ◆ and the waiting vimana. */
+  private drawMap(s: HudState): void {
+    const canvas = el<HTMLCanvasElement>('#hud .minimap canvas');
+    if (!canvas?.getContext) return;
+    const size = canvas.width;
+    this.mapBase ??= this.buildMapBase(size);
+    const g = canvas.getContext('2d');
+    if (!g) return;
+    const half = WORLD.size / 2;
+    const px = (v: number): number => ((v + half) / WORLD.size) * size;
+    g.clearRect(0, 0, size, size);
+    g.drawImage(this.mapBase, 0, 0);
+    const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 220);
+    if (s.map.vimana) {
+      const [x, z] = s.map.vimana;
+      g.fillStyle = `rgba(80, 230, 215, ${pulse})`;
+      g.beginPath();
+      g.arc(px(x), px(z), size / 28, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = '#eafffb';
+      g.font = `bold ${Math.round(size / 22)}px Georgia, serif`;
+      g.textAlign = 'center';
+      g.fillText('Vimana', px(x), px(z) + size / 12);
+    }
+    if (s.map.marker) {
+      const [x, z] = s.map.marker;
+      const mx = Math.max(8, Math.min(size - 8, px(x)));
+      const mz = Math.max(8, Math.min(size - 8, px(z)));
+      const r = size / 36;
+      g.fillStyle = '#ffd98a';
+      g.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(mx, mz - r);
+      g.lineTo(mx + r, mz);
+      g.lineTo(mx, mz + r);
+      g.lineTo(mx - r, mz);
+      g.closePath();
+      g.fill();
+      g.stroke();
+    }
+    // Rama: an arrow pointing where the camera looks (camera yaw 0 faces north, -z).
+    const ax = px(s.map.x);
+    const az = px(s.map.z);
+    g.save();
+    g.translate(ax, az);
+    g.rotate(-s.camYaw);
+    const a = size / 26;
+    g.fillStyle = '#ffffff';
+    g.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+    g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(0, -a * 1.3);
+    g.lineTo(a * 0.8, a);
+    g.lineTo(0, a * 0.45);
+    g.lineTo(-a * 0.8, a);
+    g.closePath();
+    g.fill();
+    g.stroke();
+    g.restore();
   }
 
   show(on: boolean): void {
@@ -133,6 +260,7 @@ export class Hud {
       html += `<em style="left:${(0.5 - rel / fov) * width}px">◆ ${Math.round(s.markerDistance)} m</em>`;
     }
     el('#hud .compass').innerHTML = html;
+    this.drawMap(s);
 
     // Crosshair: four ticks that close in as the bow is drawn.
     const cross = el('#hud .cross');

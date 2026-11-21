@@ -50,6 +50,8 @@
 
 - **Rakshasa, deer, vimana and clean-up (2026-11-12).** The Rodin rakshasa (grunts, archers, Maricha), golden deer and vimana are in, all through `scripts/prep-model-colors.py` (texture baked into vertex colours). The rakshasa's fused weapon is cut off with the script's cut expression. Fixes: Rama carries the bow upright at his side when not aiming; the camera no longer passes through tree trunks or shrine pillars; shrines are solid; daytime lamp glare reduced; sashes below the hips no longer stretch with the arms.
 
+- **Vimana tracker (2026-11-21).** Ujwal could not find the vimana. The compass ◆ now points at the parked vimana (it pointed at nothing in that step) and at the next gate of light during the flight. A pillar of light stands over the parked craft. New north-up minimap (top right, M enlarges) with places, the river, paths, the objective and the vimana. After the story flight, G calls the vimana for a free flight anywhere (no gates, storm or foes; G again lands; blocked during the Tataka fight). Test: `tests/vimana.spec.ts`.
+
 ## Next
 - Real character models: Higgsfield image-to-3D with rigging needs credits (balance is 0.5).
 - Ledge climbing, skill trees, cutscene cameras, depth of field.
