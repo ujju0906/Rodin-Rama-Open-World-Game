@@ -59,7 +59,7 @@ const STEPS: { id: string; text: string; at: () => [number, number] | null }[] =
   },
   {
     id: 'maze',
-    text: 'Reach the heart of the temple. Not every wall is real, and arrows know the difference',
+    text: 'Reach the glowing heart of the temple. Shimmering walls are maya: press E, or loose an arrow through them',
     at: () => [POI.temple.x, POI.temple.z],
   },
   {
@@ -235,7 +235,11 @@ export class Game {
       this.shake = Math.max(this.shake, head ? 0.25 : 0.1);
     };
     this.arrows.onPlayerHit = (d) => this.hurtPlayer(d);
+    // Arrows know the difference: one that passes through a maya wall breaks the illusion.
+    this.arrows.onMaya = (box) =>
+      this.dissolveMaya(box, 'Your arrow passes through. The wall was maya');
     this.buildMaya();
+    this.hud.setMaze(this.world.structures.templeWalls);
     this.buildTargets();
   }
 
@@ -287,6 +291,42 @@ export class Game {
       const box: Box = { x: o.x, z: o.z, w: o.w, d: o.d, h: 5, maya: true };
       this.col.boxes.push(box);
       this.mayaWalls.push({ box, mesh, fade: 0 });
+    }
+  }
+
+  /** Starts a maya wall fading away (it stops blocking once the fade ends). */
+  private dissolveMaya(box: Box, message?: string): void {
+    const w = this.mayaWalls.find((m) => m.box === box);
+    if (!w || w.box.off || w.fade > 0) return;
+    w.fade = 1;
+    this.audio.play('dispel');
+    this.fx.burst(w.mesh.position, 80, 4, 1.2, VIOLET, 0.18, -0.5, 1.5);
+    if (message) this.hud.toast(message);
+  }
+
+  /** Pressing against a maya wall: a hint first, then the illusion gives way, so no one is ever trapped. */
+  private mayaPress = 0;
+  private mayaHinted = false;
+  private updateMayaTouch(dt: number): void {
+    const p = this.player;
+    const box = this.col.mayaTouching(p.pos, PLAYER.radius);
+    const pushing = Math.hypot(this.input.moveX, this.input.moveY) > 0.3;
+    if (!box || !pushing) {
+      this.mayaPress = Math.max(0, this.mayaPress - dt);
+      return;
+    }
+    if (!this.mayaHinted) {
+      this.mayaHinted = true;
+      this.hud.toast(
+        this.drishtiKnown
+          ? 'This wall shimmers. Press E for Divya Drishti, or loose an arrow at it'
+          : 'This wall shimmers. Loose an arrow at it, or keep pushing',
+      );
+    }
+    this.mayaPress += dt;
+    if (this.mayaPress > 2.5) {
+      this.mayaPress = 0;
+      this.dissolveMaya(box, 'The wall was never there');
     }
   }
 
@@ -849,6 +889,7 @@ export class Game {
     // --- player and enemies
     p.aimPitch = this.camPitch;
     if (p.update(gdt, input, this.camYaw, this.col, canAct)) this.audio.play('dodge');
+    this.updateMayaTouch(gdt);
     for (const t of this.targets)
       t.group.visible = STEPS[this.step]!.id === 'practice' || t.group.rotation.x !== 0;
     this.enemies = this.enemies.filter((e) => {
@@ -870,7 +911,13 @@ export class Game {
       this.enemies.some((e) => e.alive && e.pos.distanceTo(p.pos) < 40) || !!this.boss?.alive;
     this.audio.update(this.world.weather.rain, fighting);
     const at = STEPS[this.step]!.at();
+    // Inside the temple after the heart is taken, the compass shows the way out (the north gate).
+    const inTemple =
+      Math.abs(p.pos.x - POI.temple.x) < 28.5 && Math.abs(p.pos.z - POI.temple.z) < 28.5;
+    const exit: [number, number] | null =
+      inTemple && this.step > stepIndex('maze') ? [GATE.x, GATE.z] : null;
     const marker: [number, number] | null =
+      exit ??
       at ??
       (this.vimana.parked
         ? [this.vimana.pos.x, this.vimana.pos.z]
@@ -884,6 +931,7 @@ export class Game {
       map: {
         x: p.pos.x,
         z: p.pos.z,
+        maya: this.mayaWalls.filter((w) => !w.box.off).map((w) => w.box),
         marker,
         vimana: this.vimana.parked ? [this.vimana.pos.x, this.vimana.pos.z] : null,
       },
@@ -1022,7 +1070,7 @@ export class Game {
     const marker: [number, number] | null = gate ? [gate.x, gate.z] : null;
     const height = Math.round(v.pos.y - this.col.groundAt(v.pos.x, v.pos.z));
     this.hud.update(dt, {
-      map: { x: v.pos.x, z: v.pos.z, marker, vimana: null },
+      map: { x: v.pos.x, z: v.pos.z, maya: [], marker, vimana: null },
       health: v.hull / VIMANA.hull,
       focus: 1,
       objective: v.free
@@ -1518,6 +1566,24 @@ export class Game {
     hurtBoss: (amount: number): void => this.boss?.hit(amount, false),
     autopilot: (): void => void (this.vimana.autopilot = true),
     callVimana: (): void => this.callVimana(),
+    /** True if a character standing here would be pushed out by a wall (used by the maze test). */
+    blocked: (x: number, z: number, ignoreMaya = false): boolean => {
+      const standing = this.mayaWalls.filter((w) => !w.box.off);
+      if (ignoreMaya) for (const w of standing) w.box.off = true;
+      const v = new THREE.Vector3(x, 0, z);
+      this.col.resolve(v, PLAYER.radius, this.col.groundAt(x, z));
+      if (ignoreMaya) for (const w of standing) w.box.off = false;
+      return Math.hypot(v.x - x, v.z - z) > 0.01;
+    },
+    calm: (): void => this.clearEnemies(),
+    ground: (x: number, z: number): number => this.col.groundAt(x, z),
+    temple: (): object => ({
+      x: POI.temple.x,
+      z: POI.temple.z,
+      floor: this.world.structures.templeFloorY,
+      openings: this.world.structures.templeOpenings.length,
+      maya: this.mayaWalls.map((w) => ({ x: w.box.x, z: w.box.z, off: !!w.box.off })),
+    }),
     vimana: (): object => ({
       parked: this.vimana.parked,
       active: this.vimana.active,

@@ -52,6 +52,8 @@
 
 - **Vimana tracker (2026-11-21).** Ujwal could not find the vimana. The compass ◆ now points at the parked vimana (it pointed at nothing in that step) and at the next gate of light during the flight. A pillar of light stands over the parked craft. New north-up minimap (top right, M enlarges) with places, the river, paths, the objective and the vimana. After the story flight, G calls the vimana for a free flight anywhere (no gates, storm or foes; G again lands; blocked during the Tataka fight). Test: `tests/vimana.spec.ts`.
 
+- **Temple maze escape (2026-11-24).** Ujwal reported no one could get out of the maze. A walk test on a 1 m grid found no broken wall layout, but the 8 maya walls could only be opened with Divya Drishti: arrows passed through them without effect (despite the hint) and pushing did nothing, so a player who didn't think of E was trapped. Now an arrow through a maya wall dissolves it, pushing against one for 2.5 s dissolves it (with a hint on first contact), the objective text says so, the minimap zooms in near the temple and draws the maze (maya walls in violet), and after the heart the compass ◆ points to the north gate. Test: `tests/maze.spec.ts` walks in to the heart and back out with the real movement code.
+
 ## Next
 - Real character models: Higgsfield image-to-3D with rigging needs credits (balance is 0.5).
 - Ledge climbing, skill trees, cutscene cameras, depth of field.

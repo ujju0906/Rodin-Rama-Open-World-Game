@@ -43,20 +43,26 @@ test('vimana tracker and free flight', async ({ page }) => {
     (await page.locator('#hud .compass em').textContent())!.replace(/[^0-9]/g, ''),
   );
   expect(dist).toBeGreaterThan(300);
-  await page.evaluate(([x, z]) => {
-    const g = window.__game.play;
-    g.teleport(x! - 60, z! + 40);
-    g.look(Math.atan2(-60, 40), 0.2);
-    g.simulate(0.2);
-  }, [parked.pos[0], parked.pos[2]]);
+  await page.evaluate(
+    ([x, z]) => {
+      const g = window.__game.play;
+      g.teleport(x! - 60, z! + 40);
+      g.look(Math.atan2(-60, 40), 0.2);
+      g.simulate(0.2);
+    },
+    [parked.pos[0], parked.pos[2]],
+  );
   await shot('beacon');
 
   // Walking up to it boards it.
-  await page.evaluate(([x, z]) => {
-    const g = window.__game.play;
-    g.teleport(x! + 3, z! + 3);
-    g.simulate(0.3);
-  }, [parked.pos[0], parked.pos[2]]);
+  await page.evaluate(
+    ([x, z]) => {
+      const g = window.__game.play;
+      g.teleport(x! + 3, z! + 3);
+      g.simulate(0.3);
+    },
+    [parked.pos[0], parked.pos[2]],
+  );
   expect((await page.evaluate(() => window.__game.play.state() as { step: string })).step).toBe(
     'flight',
   );
