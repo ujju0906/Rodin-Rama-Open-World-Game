@@ -23,7 +23,9 @@ The site uses relative paths, so it also works from a sub-folder (for example `u
 
 ## Controls
 
-W A S D move, mouse look, Shift sprint, C dodge, Space jump. Hold and release the left mouse button to shoot (right button aims). Hold Q to chant an astra; hold Tab for the astra wheel (or press 1 / 2). E is Divya Drishti. Esc pauses. P is photo mode. F shows the frame rate. Gamepads work too.
+W A S D move, mouse look, Shift sprint, C dodge, Space jump. Hold and release the left mouse button to shoot (right button aims). Hold Q to chant an astra; hold Tab for the astra wheel (or press 1 / 2). E is Divya Drishti. M enlarges the map. G calls the vimana for a free flight once the story flight is done (G again lands). Esc pauses. P is photo mode. F shows the frame rate. Gamepads work too.
+
+**Finding the vimana:** it is not in the forest from the start. It lands after you follow the golden deer from the river bridge, unmask it with Divya Drishti (E) at the end of its run and defeat Maricha. The compass ◆, the minimap and a pillar of light then lead you to it; walk up to it to board.
 
 ## Where things are
 

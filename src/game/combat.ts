@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BOW } from '../data/gameplay';
-import type { Colliders } from './collision';
+import type { Box, Colliders } from './collision';
 import type { Particles } from './particles';
 
 export interface Hittable {
@@ -33,6 +33,8 @@ export class Arrows {
   onStick: (p: THREE.Vector3) => void = () => undefined;
   onEnemyHit: (head: boolean, p: THREE.Vector3) => void = () => undefined;
   onPlayerHit: (damage: number) => void = () => undefined;
+  /** A player arrow passed through a maya wall. */
+  onMaya: (wall: Box) => void = () => undefined;
 
   constructor(size = 64) {
     const geo = new THREE.CylinderGeometry(0.012, 0.012, 0.95, 5);
@@ -126,6 +128,8 @@ export class Arrows {
             a.mesh.visible = false;
           }
         } else {
+          const maya = col.mayaAt(p);
+          if (maya) this.onMaya(maya);
           for (const t of targets) {
             if (!t.alive) continue;
             const dy = p.y - t.pos.y;

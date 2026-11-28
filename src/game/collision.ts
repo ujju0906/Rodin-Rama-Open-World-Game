@@ -95,6 +95,28 @@ export class Colliders {
     return false;
   }
 
+  /** The standing maya (illusion) wall at this point, if any. */
+  mayaAt(p: THREE.Vector3): Box | null {
+    if (Math.abs(p.x - POI.temple.x) > 36 || Math.abs(p.z - POI.temple.z) > 36) return null;
+    for (const b of this.boxes) {
+      if (!b.maya || b.off) continue;
+      if (Math.abs(p.x - b.x) < b.w / 2 && Math.abs(p.z - b.z) < b.d / 2 && p.y < this.floorY + b.h)
+        return b;
+    }
+    return null;
+  }
+
+  /** The standing maya wall a character of radius `r` at this point is pressed against, if any. */
+  mayaTouching(p: THREE.Vector3, r: number): Box | null {
+    if (Math.abs(p.x - POI.temple.x) > 36 || Math.abs(p.z - POI.temple.z) > 36) return null;
+    for (const b of this.boxes) {
+      if (!b.maya || b.off) continue;
+      if (Math.abs(p.x - b.x) < b.w / 2 + r + 0.15 && Math.abs(p.z - b.z) < b.d / 2 + r + 0.15)
+        return b;
+    }
+    return null;
+  }
+
   /** True if an arrow at this point has hit the ground or a real wall. */
   solid(p: THREE.Vector3): boolean {
     if (p.y < this.groundAt(p.x, p.z)) return true;

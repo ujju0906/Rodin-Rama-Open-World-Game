@@ -59,7 +59,7 @@ const STEPS: { id: string; text: string; at: () => [number, number] | null }[] =
   },
   {
     id: 'maze',
-    text: 'Reach the heart of the temple. Not every wall is real, and arrows know the difference',
+    text: 'Reach the glowing heart of the temple. Shimmering walls are maya: press E, or loose an arrow through them',
     at: () => [POI.temple.x, POI.temple.z],
   },
   {
@@ -68,7 +68,11 @@ const STEPS: { id: string; text: string; at: () => [number, number] | null }[] =
     at: () => null,
   },
   { id: 'maricha', text: 'Maricha is unmasked. Defeat him', at: () => null },
-  { id: 'vimana', text: 'A vimana descends, sent by the gods. Board it', at: () => null },
+  {
+    id: 'vimana',
+    text: 'A vimana has landed nearby. Follow the ◆ and the pillar of light, then walk up to it to board',
+    at: () => null,
+  },
   { id: 'flight', text: 'Fly through the gates of light', at: () => null },
   {
     id: 'toSwamp',
@@ -76,7 +80,11 @@ const STEPS: { id: string; text: string; at: () => [number, number] | null }[] =
     at: () => [POI.swamp.x, POI.swamp.z],
   },
   { id: 'boss', text: 'Defeat Tataka', at: () => null },
-  { id: 'done', text: 'The Dandaka Forest is at peace. Explore freely', at: () => null },
+  {
+    id: 'done',
+    text: 'The Dandaka Forest is at peace. Explore freely   ·   G: call the vimana',
+    at: () => null,
+  },
 ];
 const stepIndex = (id: string): number => STEPS.findIndex((s) => s.id === id);
 
@@ -101,6 +109,8 @@ export class Game {
   private targets: Target[] = [];
   private mayaWalls: { box: Box; mesh: THREE.Mesh; fade: number }[] = [];
   private readonly vimana = new Vimana();
+  /** True while riding the vimana freely (called with G after the story flight). */
+  private freeFlight = false;
   private deer = createDeer();
   private deerPos = new THREE.Vector3();
   private deerWp = 0;
@@ -225,7 +235,11 @@ export class Game {
       this.shake = Math.max(this.shake, head ? 0.25 : 0.1);
     };
     this.arrows.onPlayerHit = (d) => this.hurtPlayer(d);
+    // Arrows know the difference: one that passes through a maya wall breaks the illusion.
+    this.arrows.onMaya = (box) =>
+      this.dissolveMaya(box, 'Your arrow passes through. The wall was maya');
     this.buildMaya();
+    this.hud.setMaze(this.world.structures.templeWalls);
     this.buildTargets();
   }
 
@@ -277,6 +291,42 @@ export class Game {
       const box: Box = { x: o.x, z: o.z, w: o.w, d: o.d, h: 5, maya: true };
       this.col.boxes.push(box);
       this.mayaWalls.push({ box, mesh, fade: 0 });
+    }
+  }
+
+  /** Starts a maya wall fading away (it stops blocking once the fade ends). */
+  private dissolveMaya(box: Box, message?: string): void {
+    const w = this.mayaWalls.find((m) => m.box === box);
+    if (!w || w.box.off || w.fade > 0) return;
+    w.fade = 1;
+    this.audio.play('dispel');
+    this.fx.burst(w.mesh.position, 80, 4, 1.2, VIOLET, 0.18, -0.5, 1.5);
+    if (message) this.hud.toast(message);
+  }
+
+  /** Pressing against a maya wall: a hint first, then the illusion gives way, so no one is ever trapped. */
+  private mayaPress = 0;
+  private mayaHinted = false;
+  private updateMayaTouch(dt: number): void {
+    const p = this.player;
+    const box = this.col.mayaTouching(p.pos, PLAYER.radius);
+    const pushing = Math.hypot(this.input.moveX, this.input.moveY) > 0.3;
+    if (!box || !pushing) {
+      this.mayaPress = Math.max(0, this.mayaPress - dt);
+      return;
+    }
+    if (!this.mayaHinted) {
+      this.mayaHinted = true;
+      this.hud.toast(
+        this.drishtiKnown
+          ? 'This wall shimmers. Press E for Divya Drishti, or loose an arrow at it'
+          : 'This wall shimmers. Loose an arrow at it, or keep pushing',
+      );
+    }
+    this.mayaPress += dt;
+    if (this.mayaPress > 2.5) {
+      this.mayaPress = 0;
+      this.dissolveMaya(box, 'The wall was never there');
     }
   }
 
@@ -747,7 +797,7 @@ export class Game {
     this.timeScale += (targetScale - this.timeScale) * Math.min(1, dt * 14);
     const gdt = dt * this.timeScale;
 
-    if (STEPS[this.step]!.id === 'flight') {
+    if (STEPS[this.step]!.id === 'flight' || this.freeFlight) {
       this.updateFlight(dt);
       return 1;
     }
@@ -828,6 +878,7 @@ export class Game {
       else if (this.cooldown[this.selected]! > 0)
         this.hud.toast(`${def.name} returns in ${Math.ceil(this.cooldown[this.selected]!)} s`);
     }
+    if (canAct && input.hit('g')) this.callVimana();
     if (canAct && input.hit('e')) {
       if (!this.drishtiKnown) this.hud.toast('Divya Drishti is learned at the river shrine');
       else if (this.cooldown.drishti! > 0)
@@ -838,6 +889,7 @@ export class Game {
     // --- player and enemies
     p.aimPitch = this.camPitch;
     if (p.update(gdt, input, this.camYaw, this.col, canAct)) this.audio.play('dodge');
+    this.updateMayaTouch(gdt);
     for (const t of this.targets)
       t.group.visible = STEPS[this.step]!.id === 'practice' || t.group.rotation.x !== 0;
     this.enemies = this.enemies.filter((e) => {
@@ -859,23 +911,30 @@ export class Game {
       this.enemies.some((e) => e.alive && e.pos.distanceTo(p.pos) < 40) || !!this.boss?.alive;
     this.audio.update(this.world.weather.rain, fighting);
     const at = STEPS[this.step]!.at();
-    const marker =
+    // Inside the temple after the heart is taken, the compass shows the way out (the north gate).
+    const inTemple =
+      Math.abs(p.pos.x - POI.temple.x) < 28.5 && Math.abs(p.pos.z - POI.temple.z) < 28.5;
+    const exit: [number, number] | null =
+      inTemple && this.step > stepIndex('maze') ? [GATE.x, GATE.z] : null;
+    const marker: [number, number] | null =
+      exit ??
       at ??
-      (this.deerActive
-        ? [this.deerPos.x, this.deerPos.z]
-        : this.boss?.alive
-          ? null
-          : this.nearestEnemy());
-    let markerAngle: number | null = null;
-    let markerDistance = 0;
-    if (marker) {
-      const dx = marker[0]! - p.pos.x;
-      const dz = marker[1]! - p.pos.z;
-      markerDistance = Math.hypot(dx, dz);
-      const bearing = Math.atan2(-dx, -dz);
-      markerAngle = Math.atan2(Math.sin(bearing - this.camYaw), Math.cos(bearing - this.camYaw));
-    }
+      (this.vimana.parked
+        ? [this.vimana.pos.x, this.vimana.pos.z]
+        : this.deerActive
+          ? [this.deerPos.x, this.deerPos.z]
+          : this.boss?.alive
+            ? null
+            : this.nearestEnemy());
+    const { markerAngle, markerDistance } = this.bearingTo(marker);
     this.hud.update(dt, {
+      map: {
+        x: p.pos.x,
+        z: p.pos.z,
+        maya: this.mayaWalls.filter((w) => !w.box.off).map((w) => w.box),
+        marker,
+        vimana: this.vimana.parked ? [this.vimana.pos.x, this.vimana.pos.z] : null,
+      },
       health: p.health / p.maxHealth,
       focus: p.focus / PLAYER.focusMax,
       objective: STEPS[this.step]!.text,
@@ -913,10 +972,67 @@ export class Game {
     return this.timeScale;
   }
 
+  /** Compass bearing from Rama (or the vimana) to a point, relative to the camera. */
+  private bearingTo(marker: [number, number] | null): {
+    markerAngle: number | null;
+    markerDistance: number;
+  } {
+    if (!marker) return { markerAngle: null, markerDistance: 0 };
+    const dx = marker[0] - this.player.pos.x;
+    const dz = marker[1] - this.player.pos.z;
+    const bearing = Math.atan2(-dx, -dz);
+    return {
+      markerAngle: Math.atan2(Math.sin(bearing - this.camYaw), Math.cos(bearing - this.camYaw)),
+      markerDistance: Math.hypot(dx, dz),
+    };
+  }
+
+  /** G: after the story flight, the vimana comes down beside Rama for a free flight. */
+  private callVimana(): void {
+    const id = STEPS[this.step]!.id;
+    if (this.step <= stepIndex('flight')) {
+      this.hud.toast(
+        id === 'vimana'
+          ? 'The vimana is waiting: follow the ◆ and the pillar of light'
+          : 'No vimana answers yet. It descends after the golden deer is unmasked',
+      );
+      return;
+    }
+    if (id === 'boss') {
+      this.hud.toast('Not now: Tataka blocks the sky');
+      return;
+    }
+    const p = this.player.pos;
+    this.vimana.park(p.x, this.col.groundAt(p.x, p.z), p.z);
+    this.vimana.takeOff(this.scene, true, this.camYaw + Math.PI);
+    this.freeFlight = true;
+    this.player.root.visible = false;
+    this.audio.play('shrine');
+    this.hud.toast('The vimana answers. G again to land');
+  }
+
+  /** Ends a free flight: Rama steps down onto the ground below the craft. */
+  private landVimana(): void {
+    const v = this.vimana;
+    const x = v.pos.x;
+    const z = v.pos.z;
+    this.vimana.hide(this.scene);
+    this.freeFlight = false;
+    this.player.respawn(x, z, this.col.groundAt(x, z));
+    this.player.invulnerable = 0;
+    this.player.root.visible = true;
+    this.camPitch = -0.1;
+    this.hud.toast('You step down from the vimana');
+  }
+
   /** The vimana ride: its own controls, camera and HUD. */
   private updateFlight(dt: number): void {
     const v = this.vimana;
     const cam = this.camera;
+    if (this.freeFlight && this.input.hit('g')) {
+      this.landVimana();
+      return;
+    }
     const aim = cam.getWorldDirection(new THREE.Vector3());
     const done = v.update(
       dt,
@@ -950,12 +1066,17 @@ export class Game {
     this.camYaw = v.yaw + Math.PI;
 
     this.audio.update(this.world.weather.rain, v.targets.length > 0);
+    const gate = v.nextGate;
+    const marker: [number, number] | null = gate ? [gate.x, gate.z] : null;
+    const height = Math.round(v.pos.y - this.col.groundAt(v.pos.x, v.pos.z));
     this.hud.update(dt, {
+      map: { x: v.pos.x, z: v.pos.z, maya: [], marker, vimana: null },
       health: v.hull / VIMANA.hull,
       focus: 1,
-      objective: `Fly through the gates of light (${v.gate} of ${v.gateCount})   ·   Shift: boost   ·   Click: loose arrows`,
-      markerAngle: null,
-      markerDistance: 0,
+      objective: v.free
+        ? `Free flight (${height} m up)   ·   Mouse or A D: steer   ·   S: climb   W: dive   ·   Shift: boost   ·   G: land`
+        : `Fly through the gates of light (${v.gate} of ${v.gateCount})   ·   Shift: boost   ·   Click: loose arrows`,
+      ...this.bearingTo(marker),
       camYaw: this.camYaw,
       spread: 0.3,
       showCross: true,
@@ -1444,6 +1565,31 @@ export class Game {
     }),
     hurtBoss: (amount: number): void => this.boss?.hit(amount, false),
     autopilot: (): void => void (this.vimana.autopilot = true),
+    callVimana: (): void => this.callVimana(),
+    /** True if a character standing here would be pushed out by a wall (used by the maze test). */
+    blocked: (x: number, z: number, ignoreMaya = false): boolean => {
+      const standing = this.mayaWalls.filter((w) => !w.box.off);
+      if (ignoreMaya) for (const w of standing) w.box.off = true;
+      const v = new THREE.Vector3(x, 0, z);
+      this.col.resolve(v, PLAYER.radius, this.col.groundAt(x, z));
+      if (ignoreMaya) for (const w of standing) w.box.off = false;
+      return Math.hypot(v.x - x, v.z - z) > 0.01;
+    },
+    calm: (): void => this.clearEnemies(),
+    ground: (x: number, z: number): number => this.col.groundAt(x, z),
+    temple: (): object => ({
+      x: POI.temple.x,
+      z: POI.temple.z,
+      floor: this.world.structures.templeFloorY,
+      openings: this.world.structures.templeOpenings.length,
+      maya: this.mayaWalls.map((w) => ({ x: w.box.x, z: w.box.z, off: !!w.box.off })),
+    }),
+    vimana: (): object => ({
+      parked: this.vimana.parked,
+      active: this.vimana.active,
+      free: this.freeFlight,
+      pos: this.vimana.pos.toArray().map((v) => Math.round(v)),
+    }),
     /** Runs the game logic for a number of seconds without waiting for frames (used by tests). */
     simulate: (seconds: number): void => {
       // Runs the same per-frame input handling as the real loop, so tests can drive the game with real key and mouse events.
